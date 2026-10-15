@@ -68,8 +68,5 @@ export const WAVES: WaveDef[] = [
   },
 ];
 
-/** Enemy hit points scale up 25% per wave. */
-export const waveHpMultiplier = (waveNumber: number): number => 1 + 0.25 * (waveNumber - 1);
-
 /** Gold bonus for clearing a wave. */
 export const waveClearBonus = (waveNumber: number): number => 20 + 5 * waveNumber;

@@ -18,10 +18,18 @@ To make a shareable build, run `npm run build`. The finished game lands in `dist
 
 ## How to play
 
+Pick a difficulty on the title screen with the buttons or the left and right arrow keys. The game remembers your choice.
+
+| Level | Lives | Starting gold | Enemies |
+| --- | --- | --- | --- |
+| Easy | 30 | 200 | Weaker, and pay 20% more gold |
+| Normal | 20 | 150 | The intended challenge |
+| Hard | 10 | 125 | Tougher, grow faster each wave, and pay 10% less gold |
+
 - Pick a tower in the shop on the right, then click a grass tile to build it. Shift-click builds several.
 - Click a built tower to see its range, upgrade it, or sell it for 70% of what you spent.
 - Press **Start Wave** when you are ready. After each wave a 12-second countdown starts the next one; starting early pays a small gold bonus.
-- Each enemy that reaches the castle costs lives. Lose all 20 and the game is over. Survive wave 10 to win.
+- Each enemy that reaches the castle costs lives. Lose them all and the game is over. Survive wave 10 to win.
 
 | Key | Action |
 | --- | --- |
@@ -53,11 +61,12 @@ To make a shareable build, run `npm run build`. The finished game lands in `dist
 src/
   main.ts              Phaser game config
   config/              All tunable game data (edit these to change the game)
-    constants.ts       Tile size, starting gold and lives, timings
+    constants.ts       Tile size, sell refund, timings
+    difficulty.ts      Easy / Normal / Hard settings
     map.ts             Enemy path corners and decorations
     towers.ts          Tower stats, costs and upgrade levels
     enemies.ts         Enemy stats
-    waves.ts           Wave composition and difficulty scaling
+    waves.ts           Wave composition and clear bonus
   art/                 Pixel art drawn from character grids, no image files
   entities/            Enemy, Tower, Projectile
   systems/             Wave spawning, economy, map drawing, placement, effects
@@ -70,6 +79,7 @@ src/
 Everything is table-driven, so most changes are edits to files in `src/config`.
 
 - **Balance**: change numbers in `towers.ts`, `enemies.ts` or `waves.ts`.
+- **Difficulty**: change starting gold, lives, enemy health growth and kill rewards per level in `difficulty.ts`.
 - **New wave**: add an entry to `WAVES` in `waves.ts`. The game picks up the new total automatically.
 - **New path**: edit `PATH_TILES` in `map.ts`. Corners must be in a straight horizontal or vertical line from the previous one.
 - **New upgrade tier**: add another entry to a tower's `levels` and its cost to `upgradeCosts`.

@@ -47,7 +47,9 @@ export class UIScene extends Phaser.Scene {
     this.livesText = this.text(X + 16, 9, '');
     this.add.image(X + 78, 13, 'icon_coin').setOrigin(0.5);
     this.moneyText = this.text(X + 88, 9, '', '#ffcd75');
-    this.waveText = this.text(MAP_W + PANEL_W / 2, 28, '').setOrigin(0.5, 0);
+    this.waveText = this.text(X + 2, 28, '');
+    const d = this.gs.difficulty;
+    this.text(X + W - 2, 28, d.name.toUpperCase(), d.color).setOrigin(1, 0);
 
     TOWER_ORDER.forEach((key, i) => this.makeShopItem(key, i, 48 + i * 52));
 

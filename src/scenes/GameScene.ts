@@ -1,9 +1,17 @@
 import Phaser from 'phaser';
-import { BETWEEN_WAVES, COLS, DEPTH, MAP_H, MAP_W, ROWS, START_LIVES, START_MONEY, TILE } from '../config/constants';
+import { BETWEEN_WAVES, COLS, DEPTH, MAP_H, MAP_W, ROWS, TILE } from '../config/constants';
+import {
+  DIFFICULTIES,
+  enemyHpMultiplier,
+  killReward,
+  loadDifficulty,
+  type DifficultyDef,
+  type DifficultyKey,
+} from '../config/difficulty';
 import { ENEMIES, type EnemyKey } from '../config/enemies';
 import { buildGrid, pathPoints, PATH_TILES, tileCenter, type Point, type TileType } from '../config/map';
 import { TOWERS, TOWER_ORDER, type TowerKey } from '../config/towers';
-import { WAVES, waveClearBonus, waveHpMultiplier } from '../config/waves';
+import { WAVES, waveClearBonus } from '../config/waves';
 import { Enemy } from '../entities/Enemy';
 import { Projectile } from '../entities/Projectile';
 import { Tower } from '../entities/Tower';
@@ -22,6 +30,7 @@ export type Phase = 'build' | 'wave' | 'won' | 'lost';
 export class GameScene extends Phaser.Scene {
   economy!: Economy;
   waves!: WaveManager;
+  difficulty!: DifficultyDef;
   phase: Phase = 'build';
   /** Seconds until the next wave starts on its own; 0 means waiting for the player. */
   countdown = 0;
@@ -43,8 +52,9 @@ export class GameScene extends Phaser.Scene {
     super('Game');
   }
 
-  create(): void {
+  create(data?: { difficulty?: DifficultyKey }): void {
     // The scene object is reused on restart, so reset everything here.
+    this.difficulty = DIFFICULTIES[data?.difficulty ?? loadDifficulty()];
     this.enemies = [];
     this.towers = [];
     this.projectiles = [];
@@ -58,7 +68,7 @@ export class GameScene extends Phaser.Scene {
     this.grid = buildGrid();
     this.path = pathPoints();
     renderMap(this, this.grid);
-    this.economy = new Economy(START_MONEY, START_LIVES);
+    this.economy = new Economy(this.difficulty.startMoney, this.difficulty.startLives);
     this.waves = new WaveManager(WAVES);
     this.bars = this.add.graphics().setDepth(DEPTH.bars);
     this.rangeGfx = this.add.graphics().setDepth(DEPTH.range);
@@ -202,7 +212,7 @@ export class GameScene extends Phaser.Scene {
   // ---------- Internals ----------
 
   private spawnEnemy(key: EnemyKey): void {
-    this.enemies.push(new Enemy(this, ENEMIES[key], this.path, waveHpMultiplier(this.waves.current)));
+    this.enemies.push(new Enemy(this, ENEMIES[key], this.path, enemyHpMultiplier(this.difficulty, this.waves.current)));
   }
 
   private fire(tower: Tower, target: Enemy): void {
@@ -236,9 +246,10 @@ export class GameScene extends Phaser.Scene {
     const castle = tileCenter(...PATH_TILES[PATH_TILES.length - 1]);
     this.enemies = this.enemies.filter((e) => {
       if (e.dead) {
-        this.economy.earn(e.def.reward);
+        const reward = killReward(this.difficulty, e.def.reward);
+        this.economy.earn(reward);
         burst(this, e.pos.x, e.pos.y, e.def.color, 10, 18);
-        floatText(this, e.pos.x, e.pos.y - 10, `+${e.def.reward}`);
+        floatText(this, e.pos.x, e.pos.y - 10, `+${reward}`);
         e.destroy();
         return false;
       }
@@ -272,7 +283,12 @@ export class GameScene extends Phaser.Scene {
     this.selected = null;
     this.time.delayedCall(won ? 1200 : 600, () => {
       this.scene.pause('UI');
-      this.scene.launch('GameOver', { won, wave: this.waves.current, lives: this.economy.lives });
+      this.scene.launch('GameOver', {
+        won,
+        wave: this.waves.current,
+        lives: this.economy.lives,
+        difficulty: this.difficulty.key,
+      });
       this.scene.pause();
     });
   }

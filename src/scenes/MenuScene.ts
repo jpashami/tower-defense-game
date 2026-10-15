@@ -1,5 +1,12 @@
 import Phaser from 'phaser';
 import { FONT, GAME_H, GAME_W, MAP_H, MAP_W } from '../config/constants';
+import {
+  DIFFICULTIES,
+  DIFFICULTY_ORDER,
+  loadDifficulty,
+  saveDifficulty,
+  type DifficultyKey,
+} from '../config/difficulty';
 import { ENEMIES, type EnemyKey } from '../config/enemies';
 import { buildGrid, pathPoints } from '../config/map';
 import { Enemy } from '../entities/Enemy';
@@ -11,6 +18,9 @@ export class MenuScene extends Phaser.Scene {
   private walkers: Enemy[] = [];
   private spawnTimer = 0;
   private spawnCount = 0;
+  private difficulty: DifficultyKey = 'normal';
+  private diffButtons: Button[] = [];
+  private diffText!: Phaser.GameObjects.Text;
 
   constructor() {
     super('Menu');
@@ -31,29 +41,70 @@ export class MenuScene extends Phaser.Scene {
         .setOrigin(0.5)
         .setDepth(21);
 
-    const t = title(120, 'PIXEL TOWER\nDEFENCE', 32, '#ffcd75');
+    const t = title(104, 'PIXEL TOWER\nDEFENCE', 32, '#ffcd75');
     t.setLineSpacing(12);
-    this.tweens.add({ targets: t, y: 126, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: t, y: 110, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
 
-    title(222, 'Hold the castle for 10 waves', 8, '#94b0c2');
+    title(196, 'Hold the castle for 10 waves', 8, '#94b0c2');
+
+    // Difficulty picker: three toggle buttons and a line describing the current one.
+    this.difficulty = loadDifficulty();
+    const bw = 96;
+    const gap = 8;
+    const left = cx - (bw * 3 + gap * 2) / 2;
+    this.diffButtons = DIFFICULTY_ORDER.map(
+      (key, i) =>
+        new Button(this, {
+          x: left + i * (bw + gap),
+          y: 220,
+          w: bw,
+          h: 24,
+          label: DIFFICULTIES[key].name.toUpperCase(),
+          depth: 21,
+          onClick: () => this.setDifficulty(key),
+        }),
+    );
+    this.diffText = title(260, '', 8, '#f4f4f4');
+    this.setDifficulty(this.difficulty);
 
     const play = new Button(this, {
       x: cx - 80,
-      y: 260,
+      y: 282,
       w: 160,
       h: 36,
       label: 'PLAY',
       variant: 'primary',
       depth: 21,
-      onClick: () => this.scene.start('Game'),
+      onClick: () => this.startGame(),
     });
     play.label?.setFontSize(16);
 
-    title(338, 'Click a tower in the shop, then a grass tile.\nClick a built tower to upgrade or sell it.', 8, '#f4f4f4').setLineSpacing(8);
-    title(386, 'KEYS  1-3 build   U upgrade   S sell\nSPACE next wave   F speed   P pause   ESC cancel', 8, '#566c86').setLineSpacing(8);
+    title(352, 'Click a tower in the shop, then a grass tile.\nClick a built tower to upgrade or sell it.', 8, '#f4f4f4').setLineSpacing(8);
+    title(400, 'KEYS  1-3 build   U upgrade   S sell\nSPACE next wave   F speed   P pause   ESC cancel', 8, '#566c86').setLineSpacing(8);
 
-    this.input.keyboard?.once('keydown-ENTER', () => this.scene.start('Game'));
-    this.input.keyboard?.once('keydown-SPACE', () => this.scene.start('Game'));
+    const kb = this.input.keyboard;
+    kb?.once('keydown-ENTER', () => this.startGame());
+    kb?.once('keydown-SPACE', () => this.startGame());
+    kb?.on('keydown-LEFT', () => this.stepDifficulty(-1));
+    kb?.on('keydown-RIGHT', () => this.stepDifficulty(1));
+  }
+
+  private setDifficulty(key: DifficultyKey): void {
+    this.difficulty = key;
+    saveDifficulty(key);
+    const d = DIFFICULTIES[key];
+    DIFFICULTY_ORDER.forEach((k, i) => this.diffButtons[i].setActive(k === key));
+    this.diffText.setText(`${d.description}  ${d.startLives} lives, ${d.startMoney} gold`).setColor(d.color);
+  }
+
+  private stepDifficulty(dir: number): void {
+    const i = DIFFICULTY_ORDER.indexOf(this.difficulty);
+    const next = Phaser.Math.Clamp(i + dir, 0, DIFFICULTY_ORDER.length - 1);
+    this.setDifficulty(DIFFICULTY_ORDER[next]);
+  }
+
+  private startGame(): void {
+    this.scene.start('Game', { difficulty: this.difficulty });
   }
 
   update(_time: number, delta: number): void {

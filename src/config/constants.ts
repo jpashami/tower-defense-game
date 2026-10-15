@@ -13,8 +13,6 @@ export const PANEL_W = 160;
 export const GAME_W = MAP_W + PANEL_W;
 export const GAME_H = MAP_H;
 
-export const START_MONEY = 150;
-export const START_LIVES = 20;
 /** Fraction of everything spent on a tower that selling refunds. */
 export const SELL_REFUND = 0.7;
 /** Seconds between waves before the next one starts on its own. */
