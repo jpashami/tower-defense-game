@@ -1,0 +1,34 @@
+import Phaser from 'phaser';
+import { GAME_H, GAME_W } from './config/constants';
+import { BootScene } from './scenes/BootScene';
+import { GameOverScene } from './scenes/GameOverScene';
+import { GameScene } from './scenes/GameScene';
+import { MenuScene } from './scenes/MenuScene';
+import { UIScene } from './scenes/UIScene';
+
+const config: Phaser.Types.Core.GameConfig = {
+  type: Phaser.AUTO,
+  parent: 'game',
+  width: GAME_W,
+  height: GAME_H,
+  backgroundColor: '#1a1c2c',
+  pixelArt: true,
+  roundPixels: true,
+  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+  scene: [BootScene, MenuScene, GameScene, UIScene, GameOverScene],
+};
+
+/** Wait briefly for the pixel font so text doesn't render in the fallback first. */
+async function start(): Promise<void> {
+  try {
+    await Promise.race([
+      document.fonts.load('8px "Press Start 2P"'),
+      new Promise((resolve) => setTimeout(resolve, 2500)),
+    ]);
+  } catch {
+    // Offline: fall back to monospace.
+  }
+  new Phaser.Game(config);
+}
+
+void start();
