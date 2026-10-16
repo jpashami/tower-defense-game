@@ -67,7 +67,7 @@ src/
     towers.ts          Tower stats, costs and upgrade levels
     enemies.ts         Enemy stats
     waves.ts           Wave composition and clear bonus
-  art/                 Pixel art drawn from character grids, no image files
+  art/                 Pixel art drawn in code from shapes, no image files
   entities/            Enemy, Tower, Projectile
   systems/             Wave spawning, economy, map drawing, placement, effects
   scenes/              Boot, Menu, Game, UI (HUD), GameOver
@@ -83,9 +83,9 @@ Everything is table-driven, so most changes are edits to files in `src/config`.
 - **New wave**: add an entry to `WAVES` in `waves.ts`. The game picks up the new total automatically.
 - **New path**: edit `PATH_TILES` in `map.ts`. Corners must be in a straight horizontal or vertical line from the previous one.
 - **New upgrade tier**: add another entry to a tower's `levels` and its cost to `upgradeCosts`.
-- **New enemy**: add a sprite grid to `art/sprites.ts`, an entry to `ENEMIES`, and use its key in a wave.
+- **New enemy**: add a drawing function with two walk frames to `art/sprites.ts`, an entry to `ENEMIES`, and use its key in a wave.
 - **New tower**: add base, head and projectile sprites, an entry to `TOWERS`, and its key to `TOWER_ORDER`. The shop has room for three, so a fourth needs the HUD layout in `scenes/UIScene.ts` adjusted.
 
 ### Editing the pixel art
 
-Each sprite in `src/art/sprites.ts` is a list of strings, one per row. Each character is a colour from `src/art/palette.ts`, and `.` is transparent. Most sprites are 16x16 and drawn at 2x scale. To use real image files instead, load them in `BootScene` with the same texture keys.
+Each sprite in `src/art/sprites.ts` is a small function that draws on a 32x32 pixel canvas using shapes such as discs, rectangles and lines, then adds a dark outline. The canvas helper lives in `src/art/draw.ts`, and colours are single characters from `src/art/palette.ts`. Enemies have two walk frames named `<key>_0` and `<key>_1`. To use real image files instead, load them in `BootScene` with the same texture keys.

@@ -22,6 +22,11 @@ export const PALETTE: Record<string, string> = {
   g: '#7a4a2a', // dark wood
   h: '#c69060', // wood
   i: '#e0b884', // sand
+  j: '#4a2c1a', // darkest wood
+  m: '#2a8c52', // mid green (grass shading)
+  n: '#8b4a8b', // light plum (brute skin)
+  o: '#c27bc2', // pink highlight
+  z: 'rgba(16, 18, 30, 0.35)', // soft drop shadow
 };
 
 /** Palette colour as a number, for tints and Graphics fills. */

@@ -2,9 +2,7 @@ import Phaser from 'phaser';
 import { COLS, DEPTH, ROWS, TILE } from '../config/constants';
 import { DECORATIONS, PATH_TILES, type TileType } from '../config/map';
 import { col } from '../art/palette';
-
-export const GRASS_VARIANTS = 3;
-export const PATH_VARIANTS = 2;
+import { GRASS_VARIANTS, PATH_VARIANTS } from '../art/sprites';
 
 /** Draws ground tiles, path edges, decorations, the spawn portal and the castle. */
 export function renderMap(scene: Phaser.Scene, grid: TileType[][]): void {

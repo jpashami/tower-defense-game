@@ -1,7 +1,5 @@
 /** Size of one map tile in screen pixels. */
 export const TILE = 32;
-/** Sprite grids are drawn at this multiple (16px grid -> 32px tile). */
-export const PIXEL_SCALE = 2;
 
 export const COLS = 20;
 export const ROWS = 15;

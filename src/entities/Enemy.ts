@@ -12,7 +12,7 @@ export class Enemy extends Phaser.GameObjects.Image {
   progress = 0;
   dead = false;
   escaped = false;
-  /** Logical position on the path (the sprite adds a little hop on top). */
+  /** Logical position on the path (the sprite adds a small walk bob on top). */
   pos: Point;
 
   private readonly path: Point[];
@@ -20,15 +20,17 @@ export class Enemy extends Phaser.GameObjects.Image {
   private slowFactor = 1;
   private slowTimer = 0;
   private flashTimer = 0;
-  private hopPhase = Math.random() * Math.PI * 2;
+  private readonly shadow: Phaser.GameObjects.Image;
+  private walkFrame = -1;
 
   constructor(scene: Phaser.Scene, def: EnemyDef, path: Point[], hpMultiplier: number) {
-    super(scene, path[0].x, path[0].y, def.texture);
+    super(scene, path[0].x, path[0].y, `${def.texture}_0`);
     this.def = def;
     this.path = path;
     this.pos = { x: path[0].x, y: path[0].y };
     this.maxHp = Math.round(def.hp * hpMultiplier);
     this.hp = this.maxHp;
+    this.shadow = scene.add.image(this.pos.x, this.pos.y + 13, 'shadow').setDepth(DEPTH.deco + 0.5);
     scene.add.existing(this);
   }
 
@@ -69,9 +71,14 @@ export class Enemy extends Phaser.GameObjects.Image {
     }
     if (this.nextIndex >= this.path.length) this.escaped = true;
 
-    // A small hop while walking; slowed enemies hop slower.
-    this.hopPhase += dt * 10 * this.slowFactor;
-    this.setPosition(this.pos.x, this.pos.y - Math.abs(Math.sin(this.hopPhase)) * 2);
+    // Two-frame walk cycle driven by distance walked, plus a 1px bob.
+    const frame = Math.floor(this.progress / 9) % 2;
+    if (frame !== this.walkFrame) {
+      this.walkFrame = frame;
+      this.setTexture(`${this.def.texture}_${frame}`);
+    }
+    this.setPosition(this.pos.x, this.pos.y - 2 - frame);
+    this.shadow.setPosition(this.pos.x, this.pos.y + 13);
     this.setDepth(DEPTH.enemy + this.pos.y / 1000);
 
     if (this.flashTimer > 0) this.setTintFill(0xffffff);
@@ -87,6 +94,11 @@ export class Enemy extends Phaser.GameObjects.Image {
       this.hp = 0;
       this.dead = true;
     }
+  }
+
+  destroy(fromScene?: boolean): void {
+    this.shadow?.destroy();
+    super.destroy(fromScene);
   }
 
   slow(factor: number, duration: number): void {
