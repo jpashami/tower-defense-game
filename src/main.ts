@@ -31,7 +31,9 @@ async function start(): Promise<void> {
   } catch {
     // Offline: fall back to monospace.
   }
-  new Phaser.Game(config);
+  const game = new Phaser.Game(config);
+  // Dev server only: the balance-testing autoplayer (see src/dev/autoplay.ts).
+  if (import.meta.env.DEV) void import('./dev/autoplay').then((m) => m.install(game));
 }
 
 void start();

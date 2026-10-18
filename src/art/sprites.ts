@@ -1,4 +1,20 @@
 import { PixelCanvas, SHADOW, inDiamond, inDisc, inEllipse, inRect, minus, rng } from './draw';
+import {
+  ELITE_ICONS,
+  baseBallista,
+  baseLightning,
+  gate,
+  headBallista,
+  headLightning,
+  knight,
+  meteor,
+  projBallista,
+  shaman,
+  shortcutTile,
+  warlord,
+  wolfRider,
+  wyvern,
+} from './eliteSprites';
 
 /**
  * All game art, built in code at 32x32 (one tile) unless noted.
@@ -425,9 +441,27 @@ export function buildSprites(): Record<string, SpriteSource> {
     portal: one(portal()),
     castle: one(castle()),
     shadow: one(shadow()),
+    enemy_knight_0: one(knight(0)),
+    enemy_knight_1: one(knight(1)),
+    enemy_wolf_0: one(wolfRider(0)),
+    enemy_wolf_1: one(wolfRider(1)),
+    enemy_shaman_0: one(shaman(0)),
+    enemy_shaman_1: one(shaman(1)),
+    enemy_wyvern_0: one(wyvern(0)),
+    enemy_wyvern_1: one(wyvern(1)),
+    enemy_warlord_0: one(warlord(0)),
+    enemy_warlord_1: one(warlord(1)),
+    base_lightning: one(baseLightning()),
+    head_lightning: one(headLightning()),
+    base_ballista: one(baseBallista()),
+    head_ballista: one(headBallista()),
+    proj_ballista: one(projBallista()),
+    gate: one(gate()),
+    meteor: one(meteor()),
   };
   for (let i = 0; i < GRASS_VARIANTS; i++) out[`tile_grass_${i}`] = one(grassTile(101 + i * 17));
   for (let i = 0; i < PATH_VARIANTS; i++) out[`tile_path_${i}`] = one(pathTile(503 + i * 31));
-  for (const [key, grid] of Object.entries(ICONS)) out[key] = { grid, scale: 2 };
+  for (let i = 0; i < PATH_VARIANTS; i++) out[`tile_shortcut_${i}`] = one(shortcutTile(907 + i * 13));
+  for (const [key, grid] of Object.entries({ ...ICONS, ...ELITE_ICONS })) out[key] = { grid, scale: 2 };
   return out;
 }

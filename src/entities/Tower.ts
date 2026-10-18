@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
 import { DEPTH, SELL_REFUND, TILE } from '../config/constants';
-import type { TowerDef, TowerStats } from '../config/towers';
+import { TARGET_MODES, type TargetMode, type TowerDef, type TowerStats } from '../config/towers';
 import type { Enemy } from './Enemy';
 
-/** A built tower: picks the enemy furthest along the path and fires at it. */
+/** A built tower: picks a target by its targeting mode and fires when ready. */
 export class Tower {
   readonly def: TowerDef;
   readonly col: number;
@@ -13,6 +13,7 @@ export class Tower {
   level = 0;
   /** Total gold spent on this tower, used for the sell refund. */
   spent: number;
+  targetMode: TargetMode;
 
   private readonly scene: Phaser.Scene;
   private readonly base: Phaser.GameObjects.Image;
@@ -28,6 +29,7 @@ export class Tower {
     this.x = col * TILE + TILE / 2;
     this.y = row * TILE + TILE / 2;
     this.spent = def.cost;
+    this.targetMode = def.defaultTarget;
     this.base = scene.add.image(this.x, this.y, def.baseTexture).setDepth(DEPTH.towerBase);
     this.head = scene.add.image(this.x, this.y, def.headTexture).setDepth(DEPTH.towerHead);
     if (def.rotates) this.head.setRotation(-Math.PI / 2);
@@ -63,6 +65,17 @@ export class Tower {
     return Math.floor(this.spent * SELL_REFUND);
   }
 
+  /** Whether this tower can shoot that enemy at all (flyers need an air-capable tower). */
+  canHit(e: Enemy): boolean {
+    return e.targetable && (!e.flying || this.def.hitsAir);
+  }
+
+  inRange(e: Enemy, range = this.stats.range): boolean {
+    const dx = e.pos.x - this.x;
+    const dy = e.pos.y - this.y;
+    return dx * dx + dy * dy <= range * range;
+  }
+
   /** Advances the cooldown and returns an enemy to shoot at, if a shot is ready. */
   update(dt: number, enemies: Enemy[]): Enemy | null {
     this.cooldown -= dt;
@@ -83,6 +96,11 @@ export class Tower {
     if (!this.def.rotates) return { x: this.x, y: this.y - 4 };
     const r = this.head.rotation;
     return { x: this.x + Math.cos(r) * 12, y: this.y + Math.sin(r) * 12 };
+  }
+
+  cycleTarget(): void {
+    const i = TARGET_MODES.indexOf(this.targetMode);
+    this.targetMode = TARGET_MODES[(i + 1) % TARGET_MODES.length];
   }
 
   upgrade(): void {
@@ -110,16 +128,16 @@ export class Tower {
   }
 
   private pickTarget(enemies: Enemy[]): Enemy | null {
-    const r2 = this.stats.range * this.stats.range;
     let best: Enemy | null = null;
     let bestScore = -Infinity;
     for (const e of enemies) {
-      if (!e.targetable) continue;
-      const dx = e.pos.x - this.x;
-      const dy = e.pos.y - this.y;
-      if (dx * dx + dy * dy > r2) continue;
+      if (!this.canHit(e) || !this.inRange(e)) continue;
+      let score: number;
+      if (this.targetMode === 'strongest') score = e.hp;
+      else if (this.targetMode === 'closest') score = -Math.hypot(e.pos.x - this.x, e.pos.y - this.y);
+      else score = -e.remaining;
       // Frost towers prefer enemies that are not already chilled.
-      const score = e.progress + (this.stats.slow && !e.isSlowed ? 100000 : 0);
+      if (this.stats.slow && !e.isSlowed && !e.def.slowImmune) score += 1e6;
       if (score > bestScore) {
         bestScore = score;
         best = e;

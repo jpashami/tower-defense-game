@@ -1,12 +1,12 @@
 import { COLS, ROWS } from '../config/constants';
-import type { EnemyKey } from '../config/enemies';
+import type { CreatorEnemyKey } from '../config/enemies';
 import { defaultTuning, type LevelDef, type TowerTuning } from '../config/level';
 import { DECORATIONS, PATH_TILES, type Decoration } from '../config/map';
-import { TOWER_ORDER, type TowerKey } from '../config/towers';
+import { CREATOR_TOWERS, type CreatorTowerKey } from '../config/towers';
 import { WAVES, type SpawnGroup, type WaveDef } from '../config/waves';
 
 /** How many of each enemy one wave sends. */
-export type WaveCounts = Record<EnemyKey, number>;
+export type WaveCounts = Record<CreatorEnemyKey, number>;
 
 /**
  * A level made in the Creator. Kept deliberately simple so it is easy to edit,
@@ -20,12 +20,12 @@ export interface CustomLevel {
   path: [number, number][];
   decorations: Decoration[];
   waves: WaveCounts[];
-  towers: Record<TowerKey, TowerTuning>;
+  towers: Record<CreatorTowerKey, TowerTuning>;
   startMoney: number;
   startLives: number;
 }
 
-export const ENEMY_ORDER: EnemyKey[] = ['grunt', 'runner', 'brute'];
+export const ENEMY_ORDER: CreatorEnemyKey[] = ['grunt', 'runner', 'brute'];
 
 export const LIMITS = {
   nameLength: 16,
@@ -50,12 +50,12 @@ export function cleanName(name: string): string {
 }
 
 /** Damage step that feels right for a tower: about a tenth of its default. */
-export function damageStep(key: TowerKey): number {
+export function damageStep(key: CreatorTowerKey): number {
   return Math.max(1, Math.round(defaultTuning(key).damage / 10));
 }
 
-export function defaultTowers(): Record<TowerKey, TowerTuning> {
-  return Object.fromEntries(TOWER_ORDER.map((k) => [k, defaultTuning(k)])) as Record<TowerKey, TowerTuning>;
+export function defaultTowers(): Record<CreatorTowerKey, TowerTuning> {
+  return Object.fromEntries(CREATOR_TOWERS.map((k) => [k, defaultTuning(k)])) as Record<CreatorTowerKey, TowerTuning>;
 }
 
 const counts = (grunt: number, runner = 0, brute = 0): WaveCounts => ({ grunt, runner, brute });
@@ -93,7 +93,12 @@ export function classicLevel(): CustomLevel {
     decorations: DECORATIONS.filter((d) => !onPath.has(`${d.col},${d.row}`)).map((d) => ({ ...d })),
     waves: WAVES.map((w) => {
       const n = counts(0);
-      for (const g of w.groups) n[g.enemy] = Math.min(LIMITS.perEnemy.max, n[g.enemy] + g.count);
+      for (const g of w.groups) {
+        // Creator levels only use the three classic enemies; skip the rest.
+        if (!(ENEMY_ORDER as string[]).includes(g.enemy)) continue;
+        const e = g.enemy as CreatorEnemyKey;
+        n[e] = Math.min(LIMITS.perEnemy.max, n[e] + g.count);
+      }
       return n;
     }),
     towers: defaultTowers(),
@@ -138,7 +143,7 @@ export function pathCorners(path: [number, number][]): [number, number][] {
 }
 
 /** How a wave's enemies are spaced out. Grunts lead, runners catch up, brutes follow. */
-const SPACING: Record<EnemyKey, { interval: number; delay: number }> = {
+const SPACING: Record<CreatorEnemyKey, { interval: number; delay: number }> = {
   grunt: { interval: 0.9, delay: 0 },
   runner: { interval: 0.5, delay: 1.5 },
   brute: { interval: 2.2, delay: 3 },
@@ -212,8 +217,8 @@ export function normaliseLevel(raw: unknown): CustomLevel | null {
   if (waves.length === 0) return null;
 
   const towers = defaultTowers();
-  const rawTowers = (o.towers ?? {}) as Partial<Record<TowerKey, Partial<TowerTuning>>>;
-  for (const k of TOWER_ORDER) {
+  const rawTowers = (o.towers ?? {}) as Partial<Record<CreatorTowerKey, Partial<TowerTuning>>>;
+  for (const k of CREATOR_TOWERS) {
     const t = rawTowers[k];
     if (!t) continue;
     towers[k] = {

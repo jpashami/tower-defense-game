@@ -26,6 +26,7 @@ export const DEPTH = {
   towerBase: 3,
   enemy: 4, // plus y/1000 so lower enemies draw in front
   towerHead: 5,
+  flying: 5.5, // plus y/1000
   projectile: 6,
   effect: 7,
   bars: 8,

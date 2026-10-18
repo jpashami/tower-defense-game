@@ -1,7 +1,7 @@
 # Pixel Tower Defence
 
 A 2D pixel-art tower defence game built with [Phaser 3](https://phaser.io), TypeScript and Vite.
-Hold the castle against 10 waves of enemies by building and upgrading towers along the path.
+Hold the castle against 15 waves of enemies on a new random map every game. Mix five kinds of tower, two spells and smart upgrades to stop armoured knights, wolf riders, healers, flying wyverns and the Warlord boss.
 
 ## Run it
 
@@ -20,22 +20,37 @@ To make a shareable build, run `npm run build`. The finished game lands in `dist
 
 Pick a difficulty on the title screen with the buttons or the left and right arrow keys. The game remembers your choice.
 
-| Level | Lives | Starting gold | Enemies |
-| --- | --- | --- | --- |
-| Easy | 30 | 200 | Weaker, and pay 20% more gold |
-| Normal | 20 | 150 | The intended challenge |
-| Hard | 10 | 125 | 20% faster, 15% more of them, much tougher each wave, and pay 20% less gold |
+| Level | Lives | Starting gold | Enemies | Shortcut use |
+| --- | --- | --- | --- | --- |
+| Easy | 25 | 175 | Grow tougher slowly, pay 8% more gold | 25% of enemies |
+| Normal | 20 | 150 | A real fight that needs planning | 35% of enemies |
+| Hard | 12 | 125 | 10% faster, 10% more of them, pay 10% less gold | 50% of enemies |
+
+### Maps and the shortcut
+
+Every game makes a **new random map**: a winding path from the portal to the castle with trees and rocks scattered around. **NEW MAP** on the title screen rolls another one, and the map number lets you remember a good one. Switch to **CLASSIC MAP** to play the original hand-made map.
+
+Random maps have a **shortcut**: a darker strip of dirt cutting across one bend of the path, blocked by barricades. The barricades break on wave 3, and from then on some enemies take the shorter route, so guard both. Switch it off with **SHORTCUT ON/OFF**. Change the wave it opens on in `src/config/shortcut.ts`, and how many enemies use it in `src/config/difficulty.ts`.
+
+### Playing
 
 - Pick a tower in the shop on the right, then click a grass tile to build it. Shift-click builds several.
 - Click a built tower to see its range, upgrade it, or sell it for 70% of what you spent.
 - Press **Start Wave** when you are ready. After each wave a 12-second countdown starts the next one; starting early pays a small gold bonus.
-- Each enemy that reaches the castle costs lives. Lose them all and the game is over. Survive wave 10 to win.
+- Each enemy that reaches the castle costs lives. Lose them all and the game is over. Survive wave 15 to win.
+- When nothing is selected, the panel shows what the **next wave** will send, so you can prepare. New enemy types are introduced with a tip the first time they appear.
+- Each tower has a **target** button: **FIRST** (closest to the castle), **STRONG** (most health) or **CLOSE** (nearest the tower).
+- **Spells** recharge while a wave is running. **Meteor** crushes ground enemies where you click. **Freeze** stops every enemy for 3 seconds (bosses are only slowed).
 
 | Key | Action |
 | --- | --- |
-| 1, 2, 3 | Pick Archer, Cannon, Frost |
+| 1 to 5 | Pick Archer, Cannon, Frost, Lightning, Ballista |
 | U | Upgrade selected tower |
 | S | Sell selected tower |
+| T | Change selected tower's target |
+| Q | Meteor (then click the map) |
+| W | Freeze |
+| N | New map (title screen) |
 | Space | Start next wave |
 | F | Toggle 1x / 2x speed |
 | P | Pause |
@@ -59,17 +74,26 @@ Press **CREATE** on the title screen to open the Creator. No typing needed, apar
 
 ## Towers and enemies
 
-| Tower | Cost | Role |
-| --- | --- | --- |
-| Archer | 50 | Fast single-target shots |
-| Cannon | 90 | Slow shells with splash damage |
-| Frost | 60 | Slows enemies; upgraded version chills an area |
+Every tower has three levels. Lightning and Ballista are locked until their wave starts.
 
-| Enemy | Trait |
-| --- | --- |
-| Grunt | Average speed and health |
-| Runner | Fast but fragile |
-| Brute | Slow and tough; costs 3 lives if it gets through |
+| Tower | Cost | Unlocks | Role |
+| --- | --- | --- | --- |
+| Archer | 50 | Start | Fast single shots. Hits flyers. Weak against armour |
+| Cannon | 90 | Start | Splash damage on groups. Ground only |
+| Frost | 60 | Start | Slows enemies; higher levels chill an area. Ground only |
+| Lightning | 150 | Wave 4 | Bolts jump between up to 6 enemies, flyers included |
+| Ballista | 200 | Wave 7 | Very long range, huge damage, pierces armour, hits flyers |
+
+| Enemy | First seen | Trait |
+| --- | --- | --- |
+| Grunt | Wave 1 | Average speed and health |
+| Runner | Wave 2 | Fast but fragile |
+| Knight | Wave 3 | Armour removes 8 damage from every hit. Use cannons, ballistas or the meteor |
+| Brute | Wave 4 | Slow and tough; costs 3 lives |
+| Shaman | Wave 4 | Heals enemies around it. Kill it first |
+| Warlord | Waves 5, 10, 15 | Boss: huge health, armour, can't be slowed; costs 6 lives |
+| Wyvern | Wave 6 | Flies straight to the castle over everything. Only Archer, Lightning and Ballista can hit it |
+| Wolf Rider | Wave 8 | Very fast and tough |
 
 ## Project layout
 
@@ -79,15 +103,19 @@ src/
   config/              All tunable game data (edit these to change the game)
     constants.ts       Tile size, sell refund, timings
     difficulty.ts      Easy / Normal / Hard settings
-    map.ts             Enemy path corners and decorations
+    shortcut.ts        When the shortcut opens
+    spells.ts          Meteor and Freeze
+    settings.ts        Title-screen choices remembered in the browser
+    map.ts             The classic map's path and decorations, path helpers
     towers.ts          Tower stats, costs and upgrade levels
     enemies.ts         Enemy stats
     waves.ts           Wave composition and clear bonus
     level.ts           LevelDef (map, waves, tower tuning) and the built-in level
   editor/              Creator levels: format, validation, share codes, saving
+  dev/autoplay.ts      Test player for balancing (dev server only, see below)
   art/                 Pixel art drawn in code from shapes, no image files
   entities/            Enemy, Tower, Projectile
-  systems/             Wave spawning, economy, map drawing, placement, effects
+  systems/             Random map generator, wave spawning, economy, map drawing, placement, effects
   scenes/              Boot, Menu, Game, UI (HUD), GameOver, Editor (the Creator)
   ui/Button.ts         Pixel-style button
 ```
@@ -101,9 +129,20 @@ Everything is table-driven, so most changes are edits to files in `src/config`.
 - **New wave**: add an entry to `WAVES` in `waves.ts`. The game picks up the new total automatically.
 - **New path**: edit `PATH_TILES` in `map.ts`. Corners must be in a straight horizontal or vertical line from the previous one.
 - **New upgrade tier**: add another entry to a tower's `levels` and its cost to `upgradeCosts`.
-- **New enemy**: add a drawing function with two walk frames to `art/sprites.ts`, an entry to `ENEMIES`, and use its key in a wave.
-- **New tower**: add base, head and projectile sprites, an entry to `TOWERS`, and its key to `TOWER_ORDER`. The shop has room for three, so a fourth needs the HUD layout in `scenes/UIScene.ts` adjusted.
+- **New enemy**: add a drawing function with two walk frames to `art/eliteSprites.ts`, register it in `art/sprites.ts`, add an entry to `ENEMIES`, and use its key in a wave.
+- **New tower**: add base, head and projectile sprites, an entry to `TOWERS`, and its key to `TOWER_ORDER`. The shop has room for five, so a sixth needs the HUD layout in `scenes/UIScene.ts` adjusted.
+- **Creator levels** use only the original three towers and three enemies, so share codes stay short and keep working.
 
 ### Editing the pixel art
 
 Each sprite in `src/art/sprites.ts` is a small function that draws on a 32x32 pixel canvas using shapes such as discs, rectangles and lines, then adds a dark outline. The canvas helper lives in `src/art/draw.ts`, and colours are single characters from `src/art/palette.ts`. Enemies have two walk frames named `<key>_0` and `<key>_1`. To use real image files instead, load them in `BootScene` with the same texture keys.
+
+### Testing the balance
+
+On the dev server (`npm run dev`), the browser console has a test player that plays whole games in about a second each, without drawing them:
+
+```js
+simulateMany({ difficulty: 'normal', strategy: 'smart', games: 8 })
+```
+
+`smart` uses every tower, upgrades and both spells; `medium` sticks to the three basic towers; `naive` only builds archers. The result shows wins, lives left and which enemies got through. The current numbers were tuned so that on Normal a smart player wins most games with lives to spare, and on Hard only some of the time.

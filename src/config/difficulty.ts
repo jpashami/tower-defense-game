@@ -16,6 +16,8 @@ export interface DifficultyDef {
   speedMult: number;
   /** Multiplier on how many enemies each wave sends (spawned proportionally faster). */
   countMult: number;
+  /** Share of enemies that take an open shortcut (0 to 1). */
+  shortcutChance: number;
   /** HUD text colour. */
   color: string;
 }
@@ -24,40 +26,43 @@ export const DIFFICULTIES: Record<DifficultyKey, DifficultyDef> = {
   easy: {
     key: 'easy',
     name: 'Easy',
-    description: 'Weaker enemies, bigger rewards.',
-    startMoney: 200,
-    startLives: 30,
-    hpBase: 0.85,
-    hpGrowth: 0.15,
-    rewardMult: 1.2,
+    description: 'Gentler enemies, extra gold.',
+    startMoney: 175,
+    startLives: 25,
+    hpBase: 1,
+    hpGrowth: 0.14,
+    rewardMult: 1.08,
     speedMult: 1,
     countMult: 1,
+    shortcutChance: 0.25,
     color: '#a7f070',
   },
   normal: {
     key: 'normal',
     name: 'Normal',
-    description: 'The intended challenge.',
+    description: 'A real fight. Plan ahead.',
     startMoney: 150,
     startLives: 20,
     hpBase: 1,
-    hpGrowth: 0.25,
+    hpGrowth: 0.17,
     rewardMult: 1,
     speedMult: 1,
     countMult: 1,
+    shortcutChance: 0.35,
     color: '#ffcd75',
   },
   hard: {
     key: 'hard',
     name: 'Hard',
-    description: 'More, faster, tougher enemies.',
+    description: 'Faster, bigger waves, less gold.',
     startMoney: 125,
-    startLives: 10,
+    startLives: 12,
     hpBase: 1,
-    hpGrowth: 0.46,
-    rewardMult: 0.8,
-    speedMult: 1.2,
-    countMult: 1.15,
+    hpGrowth: 0.18,
+    rewardMult: 0.9,
+    speedMult: 1.1,
+    countMult: 1.1,
+    shortcutChance: 0.5,
     color: '#ef7d57',
   },
 };

@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
 import { DEPTH, FONT, GAME_H, GAME_W, MAP_H, MAP_W, PANEL_W, ROWS, TILE } from '../config/constants';
-import { ENEMIES, type EnemyKey } from '../config/enemies';
+import { ENEMIES, type CreatorEnemyKey } from '../config/enemies';
 import { defaultTuning } from '../config/level';
 import { buildGrid, type DecorationKind } from '../config/map';
-import { TOWERS, TOWER_ORDER } from '../config/towers';
+import { CREATOR_TOWERS as TOWER_ORDER, TOWERS } from '../config/towers';
 import {
   blankLevel,
   canExtendPath,
@@ -38,7 +38,7 @@ const TOAST_DEPTH = 40;
 const OVERLAY_DEPTH = 50;
 
 /** Enemy colours for the wave chart; the brute's own plum is too dark on the panel. */
-const CHART_COLORS: Record<EnemyKey, number> = { grunt: 0x38b764, runner: 0xef7d57, brute: 0xc27bc2 };
+const CHART_COLORS: Record<CreatorEnemyKey, number> = { grunt: 0x38b764, runner: 0xef7d57, brute: 0xc27bc2 };
 
 const TOOL_HINTS: Record<Tool, string> = {
   path: 'Click squares in a line from the left edge. The last one is the castle.',

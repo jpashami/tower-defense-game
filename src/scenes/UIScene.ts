@@ -1,16 +1,30 @@
 import Phaser from 'phaser';
 import { FONT, GAME_H, MAP_W, PANEL_W, TILE } from '../config/constants';
-import { TOWER_ORDER, type TowerDef, type TowerKey } from '../config/towers';
+import { ENEMIES } from '../config/enemies';
+import { SPELLS, SPELL_ORDER, type SpellKey } from '../config/spells';
+import { TOWER_ORDER, type TargetMode, type TowerDef, type TowerKey } from '../config/towers';
 import { Button } from '../ui/Button';
 import type { GameScene } from './GameScene';
 
 const X = MAP_W + 8;
 const W = PANEL_W - 16;
 
+// Panel layout (y positions).
+const SHOP_Y = 40;
+const SHOP_STEP = 33;
+const SHOP_H = 30;
+const INFO_Y = 208;
+const INFO_H = 110;
+const PREVIEW_ROWS = 6;
+
+const TARGET_LABEL: Record<TargetMode, string> = { first: 'FIRST', strongest: 'STRONG', closest: 'CLOSE' };
+
 interface ShopItem {
   key: TowerKey;
   button: Button;
   parts: Phaser.GameObjects.Components.Alpha[];
+  lock: Phaser.GameObjects.Image;
+  lockText: Phaser.GameObjects.Text;
 }
 
 /** Right-hand HUD. Polls the game scene each frame and forwards button presses to it. */
@@ -22,8 +36,12 @@ export class UIScene extends Phaser.Scene {
   private shop: ShopItem[] = [];
   private infoTitle!: Phaser.GameObjects.Text;
   private infoBody!: Phaser.GameObjects.Text;
+  private previewIcons: Phaser.GameObjects.Image[] = [];
+  private previewTexts: Phaser.GameObjects.Text[] = [];
   private upgradeBtn!: Button;
   private sellBtn!: Button;
+  private targetBtn!: Button;
+  private spellBtns!: Record<SpellKey, Button>;
   private startBtn!: Button;
   private speedBtn!: Button;
   private pauseBtn!: Button;
@@ -36,42 +54,65 @@ export class UIScene extends Phaser.Scene {
   create(): void {
     this.gs = this.scene.get('Game') as GameScene;
     this.shop = [];
+    this.previewIcons = [];
+    this.previewTexts = [];
 
     const g = this.add.graphics();
     g.fillStyle(0x1a1c2c, 1).fillRect(MAP_W, 0, PANEL_W, GAME_H);
     g.fillStyle(0x333c57, 1).fillRect(MAP_W, 0, 2, GAME_H);
-    // Info box frame.
-    g.fillStyle(0x262b3e, 1).fillRect(X, 206, W, 190);
-    g.lineStyle(1, 0x333c57, 1).strokeRect(X + 0.5, 206.5, W - 1, 189);
+    g.fillStyle(0x262b3e, 1).fillRect(X, INFO_Y, W, INFO_H);
+    g.lineStyle(1, 0x333c57, 1).strokeRect(X + 0.5, INFO_Y + 0.5, W - 1, INFO_H - 1);
 
-    this.add.image(X + 6, 13, 'icon_heart').setOrigin(0.5);
-    this.livesText = this.text(X + 16, 9, '');
-    this.add.image(X + 78, 13, 'icon_coin').setOrigin(0.5);
-    this.moneyText = this.text(X + 88, 9, '', '#ffcd75');
-    this.waveText = this.text(X + 2, 28, '');
+    this.add.image(X + 6, 11, 'icon_heart').setOrigin(0.5);
+    this.livesText = this.text(X + 16, 7, '');
+    this.add.image(X + 78, 11, 'icon_coin').setOrigin(0.5);
+    this.moneyText = this.text(X + 88, 7, '', '#ffcd75');
+    this.waveText = this.text(X + 2, 24, '');
     const d = this.gs.difficulty;
-    if (this.gs.custom) this.text(X + W - 2, 28, 'CUSTOM', '#73eff7').setOrigin(1, 0);
-    else this.text(X + W - 2, 28, d.name.toUpperCase(), d.color).setOrigin(1, 0);
+    if (this.gs.custom) this.text(X + W - 2, 24, 'CUSTOM', '#73eff7').setOrigin(1, 0);
+    else this.text(X + W - 2, 24, d.name.toUpperCase(), d.color).setOrigin(1, 0);
 
-    TOWER_ORDER.forEach((key, i) => this.makeShopItem(key, i, 48 + i * 52));
+    TOWER_ORDER.forEach((key, i) => this.makeShopItem(key, i, SHOP_Y + i * SHOP_STEP));
 
-    this.infoTitle = this.text(X + 6, 214, '', '#ffcd75');
-    this.infoBody = this.text(X + 6, 232, '', '#d0dae2').setLineSpacing(5).setWordWrapWidth(W - 12);
+    this.infoTitle = this.text(X + 6, INFO_Y + 6, '', '#ffcd75');
+    this.infoBody = this.text(X + 6, INFO_Y + 22, '', '#d0dae2').setLineSpacing(4).setWordWrapWidth(W - 12);
+    for (let i = 0; i < PREVIEW_ROWS; i++) {
+      const y = INFO_Y + 30 + i * 13;
+      this.previewIcons.push(this.add.image(X + 14, y, 'px').setScale(0.4).setVisible(false));
+      this.previewTexts.push(this.text(X + 26, y - 4, '').setVisible(false));
+    }
 
-    this.upgradeBtn = new Button(this, { x: X + 4, y: 342, w: W - 8, h: 22, label: '', variant: 'primary', onClick: () => this.gs.upgradeSelected() });
-    this.sellBtn = new Button(this, { x: X + 4, y: 368, w: W - 8, h: 22, label: '', variant: 'danger', onClick: () => this.gs.sellSelected() });
-    this.startBtn = new Button(this, { x: X, y: 404, w: W, h: 30, label: 'START WAVE', variant: 'primary', onClick: () => this.gs.startNextWave() });
-    this.speedBtn = new Button(this, { x: X, y: 442, w: 68, h: 28, label: '', onClick: () => this.gs.toggleSpeed() });
+    const half = (W - 4) / 2;
+    this.upgradeBtn = new Button(this, { x: X, y: 322, w: W, h: 18, label: '', variant: 'primary', onClick: () => this.gs.upgradeSelected() });
+    this.sellBtn = new Button(this, { x: X, y: 344, w: half, h: 18, label: '', variant: 'danger', onClick: () => this.gs.sellSelected() });
+    this.targetBtn = new Button(this, { x: X + half + 4, y: 344, w: half, h: 18, label: '', onClick: () => this.gs.cycleTargetSelected() });
     this.quitBtn = new Button(this, {
-      x: X + 4,
-      y: 368,
-      w: W - 8,
-      h: 22,
+      x: X,
+      y: 322,
+      w: W,
+      h: 18,
       label: this.gs.custom ? 'BACK TO CREATOR' : 'MAIN MENU',
       variant: 'danger',
       onClick: () => this.gs.quit(),
     });
-    this.pauseBtn = new Button(this, { x: X + W - 68, y: 442, w: 68, h: 28, label: '', onClick: () => this.gs.togglePause() });
+
+    this.spellBtns = {} as Record<SpellKey, Button>;
+    SPELL_ORDER.forEach((key, i) => {
+      this.spellBtns[key] = new Button(this, {
+        x: X + i * (half + 4),
+        y: 368,
+        w: half,
+        h: 22,
+        label: '',
+        variant: 'accent',
+        onClick: () => this.gs.castSpell(key),
+      });
+    });
+
+    this.startBtn = new Button(this, { x: X, y: 396, w: W, h: 28, label: 'START WAVE', variant: 'primary', onClick: () => this.gs.startNextWave() });
+    this.speedBtn = new Button(this, { x: X, y: 430, w: 68, h: 24, label: '', onClick: () => this.gs.toggleSpeed() });
+    this.pauseBtn = new Button(this, { x: X + W - 68, y: 430, w: 68, h: 24, label: '', onClick: () => this.gs.togglePause() });
+    this.text(X + W / 2, 462, 'Q METEOR  W FREEZE', '#566c86').setOrigin(0.5, 0);
   }
 
   update(): void {
@@ -83,12 +124,25 @@ export class UIScene extends Phaser.Scene {
     this.waveText.setText(`WAVE ${Math.max(gs.waves.current, 1)}/${gs.waves.total}`);
 
     for (const item of this.shop) {
-      const affordable = money >= gs.towerDefs[item.key].cost;
-      item.button.setEnabled(affordable && !gs.isOver).setActive(gs.placement.type === item.key);
-      item.parts.forEach((p) => p.setAlpha(affordable ? 1 : 0.4));
+      const def = gs.towerDefs[item.key];
+      const unlocked = gs.isUnlocked(item.key);
+      const affordable = money >= def.cost;
+      item.button.setEnabled(unlocked && affordable && !gs.isOver).setActive(gs.placement.type === item.key);
+      item.parts.forEach((p) => p.setAlpha(unlocked && affordable ? 1 : 0.4));
+      item.lock.setVisible(!unlocked);
+      item.lockText.setVisible(!unlocked);
     }
 
     this.updateInfo();
+
+    for (const key of SPELL_ORDER) {
+      const cd = gs.spellCooldown[key];
+      const label = cd > 0 ? `${Math.ceil(cd)}s` : SPELLS[key].name.toUpperCase();
+      this.spellBtns[key]
+        .setLabel(label)
+        .setEnabled(gs.spellReady(key))
+        .setActive(key === 'meteor' && gs.aimingMeteor);
+    }
 
     if (gs.phase === 'wave') this.startBtn.setLabel(`ENEMIES ${gs.enemiesAlive}`).setEnabled(false);
     else if (gs.isOver) this.startBtn.setLabel('GAME OVER').setEnabled(false);
@@ -102,16 +156,21 @@ export class UIScene extends Phaser.Scene {
   private updateInfo(): void {
     const gs = this.gs;
     const t = gs.selected;
-    this.quitBtn.setVisible(gs.paused && !gs.isOver);
-    if (gs.paused && !gs.isOver) {
-      this.upgradeBtn.setVisible(false);
-      this.sellBtn.setVisible(false);
+    const paused = gs.paused && !gs.isOver;
+    this.quitBtn.setVisible(paused);
+    this.showPreview(false);
+    this.upgradeBtn.setVisible(false);
+    this.sellBtn.setVisible(false);
+    this.targetBtn.setVisible(false);
+
+    if (paused) {
       this.infoTitle.setText('PAUSED');
-      this.infoBody.setText(
-        this.gs.custom
-          ? 'Press PLAY to\ncarry on, or go\nback to change\nyour level.'
-          : 'Press PLAY to\ncarry on, or\nleave this game.',
-      );
+      this.infoBody.setText(gs.custom ? 'Press PLAY to\ncarry on, or go\nback to change\nyour level.' : 'Press PLAY to\ncarry on, or\nleave this game.');
+      return;
+    }
+    if (gs.aimingMeteor) {
+      this.infoTitle.setText('METEOR');
+      this.infoBody.setText('Click the map\nto drop it.\n\nRight-click or\nESC to cancel.');
       return;
     }
     if (t) {
@@ -123,36 +182,57 @@ export class UIScene extends Phaser.Scene {
         .setVisible(true)
         .setLabel(cost === null ? 'MAX LEVEL' : `UPGRADE ${cost}`)
         .setEnabled(cost !== null && gs.economy.canAfford(cost));
-      this.sellBtn.setVisible(true).setLabel(`SELL +${t.sellValue}`);
+      this.sellBtn.setVisible(true).setLabel(`SELL ${t.sellValue}`);
+      this.targetBtn.setVisible(true).setLabel(TARGET_LABEL[t.targetMode]);
       return;
     }
-    this.upgradeBtn.setVisible(false);
-    this.sellBtn.setVisible(false);
-
     const placing = gs.placement.type;
     if (placing) {
       const def = gs.towerDefs[placing];
       this.infoTitle.setText(def.name.toUpperCase());
-      this.infoBody.setText(`${def.description}\n\n${statLines(def, 0, null)}\n\nShift-click to\nbuild several.`);
+      const s0 = def.levels[0];
+      this.infoBody.setText(`${def.description}\n\nDMG ${s0.damage} RNG ${(s0.range / TILE).toFixed(1)}`);
       return;
     }
-    this.infoTitle.setText('HOW TO PLAY');
-    this.infoBody.setText(
-      'Buy a tower,\nthen click on\ngrass to build.\n\nClick a tower\nto upgrade or\nsell it.\n\nGuard the castle\nfrom the horde!',
-    );
+    const preview = gs.nextWavePreview();
+    if (!preview) {
+      this.infoTitle.setText('FINAL WAVE!');
+      this.infoBody.setText('Hold on!');
+      return;
+    }
+    this.infoTitle.setText(`${gs.phase === 'wave' ? 'NEXT' : 'COMING'}: WAVE ${preview.wave}`);
+    this.infoBody.setText('');
+    this.showPreview(true, preview.items);
+  }
+
+  /** One row per enemy type in the coming wave: icon, count and name. */
+  private showPreview(show: boolean, items: { enemy: keyof typeof ENEMIES; count: number }[] = []): void {
+    for (let i = 0; i < PREVIEW_ROWS; i++) {
+      const item = show ? items[i] : undefined;
+      const icon = this.previewIcons[i];
+      const text = this.previewTexts[i];
+      icon.setVisible(!!item);
+      text.setVisible(!!item);
+      if (!item) continue;
+      const def = ENEMIES[item.enemy];
+      icon.setTexture(`${def.texture}_0`).setScale(0.45);
+      text.setText(`${String(item.count).padStart(2)} ${def.name.toUpperCase()}`).setColor(def.boss ? '#ef7d57' : '#d0dae2');
+    }
   }
 
   private makeShopItem(key: TowerKey, index: number, y: number): void {
     const def = this.gs.towerDefs[key];
-    const button = new Button(this, { x: X, y, w: W, h: 48, onClick: () => this.gs.beginPlacement(key) });
-    const cy = y + 24;
-    const base = this.add.image(X + 22, cy, def.baseTexture);
-    const head = this.add.image(X + 22, cy, def.headTexture).setRotation(def.rotates ? -Math.PI / 4 : 0);
-    const name = this.text(X + 44, y + 10, def.name.toUpperCase());
-    const coin = this.add.image(X + 48, y + 33, 'icon_coin');
-    const cost = this.text(X + 58, y + 29, String(def.cost), '#ffcd75');
-    const hotkey = this.text(X + W - 12, y + 6, String(index + 1), '#566c86');
-    this.shop.push({ key, button, parts: [base, head, name, coin, cost, hotkey] });
+    const button = new Button(this, { x: X, y, w: W, h: SHOP_H, onClick: () => this.gs.beginPlacement(key) });
+    const cy = y + SHOP_H / 2;
+    const base = this.add.image(X + 16, cy, def.baseTexture).setScale(0.8);
+    const head = this.add.image(X + 16, cy, def.headTexture).setScale(0.8).setRotation(def.rotates ? -Math.PI / 4 : 0);
+    const name = this.text(X + 34, y + 5, def.name.toUpperCase());
+    const coin = this.add.image(X + 38, y + 21, 'icon_coin').setScale(0.75);
+    const cost = this.text(X + 46, y + 17, String(def.cost), '#ffcd75');
+    const hotkey = this.text(X + W - 10, y + 4, String(index + 1), '#566c86');
+    const lock = this.add.image(X + W - 34, y + 21, 'icon_lock').setVisible(false);
+    const lockText = this.text(X + W - 24, y + 17, `W${def.unlockWave ?? ''}`, '#94b0c2').setVisible(false);
+    this.shop.push({ key, button, parts: [base, head, name, coin, cost, hotkey], lock, lockText });
   }
 
   private text(x: number, y: number, str: string, color = '#f4f4f4'): Phaser.GameObjects.Text {
@@ -164,7 +244,7 @@ export class UIScene extends Phaser.Scene {
 function statLines(def: TowerDef, level: number, next: number | null): string {
   const s = def.levels[level];
   const n = next === null ? null : def.levels[next];
-  const fmt = (label: string, a: string, b?: string) => `${label.padEnd(5)}${a}${b && b !== a ? ` > ${b}` : ''}`;
+  const fmt = (label: string, a: string, b?: string) => `${label.padEnd(5)}${a}${b && b !== a ? `>${b}` : ''}`;
   const lines = [
     fmt('DMG', String(s.damage), n ? String(n.damage) : undefined),
     fmt('RNG', (s.range / TILE).toFixed(1), n ? (n.range / TILE).toFixed(1) : undefined),
@@ -177,5 +257,8 @@ function statLines(def: TowerDef, level: number, next: number | null): string {
     const pct = (f: number) => `${Math.round((1 - f) * 100)}%`;
     lines.push(fmt('SLOW', pct(s.slow.factor), n?.slow ? pct(n.slow.factor) : undefined));
   }
+  if (s.chain) lines.push(fmt('JUMP', String(s.chain.count), n?.chain ? String(n.chain.count) : undefined));
+  const tags = [def.hitsAir ? 'AIR' : 'GROUND', def.pierce ? 'PIERCE' : ''].filter(Boolean).join(' ');
+  lines.push(tags);
   return lines.join('\n');
 }

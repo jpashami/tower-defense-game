@@ -17,11 +17,12 @@ export function renderMap(
   const made: Phaser.GameObjects.GameObject[] = [];
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      const isPath = grid[r][c] === 'path';
-      const variant = (c * 7 + r * 13) % (isPath ? PATH_VARIANTS : GRASS_VARIANTS);
+      const type = grid[r][c];
+      const ground = type === 'path' ? 'tile_path' : type === 'shortcut' ? 'tile_shortcut' : 'tile_grass';
+      const variant = (c * 7 + r * 13) % (type === 'path' || type === 'shortcut' ? PATH_VARIANTS : GRASS_VARIANTS);
       made.push(
         scene.add
-          .image(c * TILE, r * TILE, `${isPath ? 'tile_path' : 'tile_grass'}_${variant}`)
+          .image(c * TILE, r * TILE, `${ground}_${variant}`)
           .setOrigin(0)
           .setDepth(DEPTH.ground),
       );
@@ -32,10 +33,11 @@ export function renderMap(
   const edge = scene.add.graphics().setDepth(DEPTH.pathEdge);
   made.push(edge);
   edge.fillStyle(col('g'), 1);
-  const isPath = (c: number, r: number) => c < 0 || c >= COLS || r < 0 || r >= ROWS || grid[r][c] === 'path';
+  const isPath = (c: number, r: number) =>
+    c < 0 || c >= COLS || r < 0 || r >= ROWS || grid[r][c] === 'path' || grid[r][c] === 'shortcut';
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
-      if (grid[r][c] !== 'path') continue;
+      if (!isPath(c, r)) continue;
       const x = c * TILE;
       const y = r * TILE;
       if (!isPath(c, r - 1)) edge.fillRect(x, y, TILE, 2);

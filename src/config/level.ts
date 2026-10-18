@@ -1,3 +1,4 @@
+import { generateMap, type ShortcutDef } from '../systems/MapGenerator';
 import { DECORATIONS, PATH_TILES, type Decoration } from './map';
 import { TOWERS, type TowerDef, type TowerKey } from './towers';
 import { WAVES, type WaveDef } from './waves';
@@ -22,6 +23,10 @@ export interface LevelDef {
   /** When unset, the chosen difficulty decides. */
   startMoney?: number;
   startLives?: number;
+  /** A second, shorter route some enemies take once it opens. */
+  shortcut?: ShortcutDef;
+  /** Set for generated maps so they can be replayed. */
+  seed?: number;
 }
 
 /** The hand-made level the game ships with. */
@@ -31,6 +36,19 @@ export const BUILTIN_LEVEL: LevelDef = {
   decorations: DECORATIONS,
   waves: WAVES,
 };
+
+/** A freshly generated map with the standard campaign waves. */
+export function randomLevel(seed: number): LevelDef {
+  const map = generateMap(seed);
+  return {
+    name: `MAP ${seed}`,
+    path: map.corners,
+    decorations: map.decorations,
+    waves: WAVES,
+    shortcut: map.shortcut,
+    seed,
+  };
+}
 
 /** The default level-1 numbers for a tower. */
 export function defaultTuning(key: TowerKey): TowerTuning {

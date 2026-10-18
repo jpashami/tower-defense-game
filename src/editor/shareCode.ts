@@ -1,4 +1,4 @@
-import { TOWER_ORDER } from '../config/towers';
+import { CREATOR_TOWERS as TOWER_ORDER } from '../config/towers';
 import { defaultTuning } from '../config/level';
 import { ENEMY_ORDER, normaliseLevel, type CustomLevel, type WaveCounts } from './customLevel';
 

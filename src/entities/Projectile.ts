@@ -8,6 +8,8 @@ export class Projectile extends Phaser.GameObjects.Image {
   readonly kind: TowerKey;
   readonly stats: TowerStats;
   readonly target: Enemy;
+  /** Ignores armour (Ballista bolts). */
+  readonly pierce: boolean;
   done = false;
   tx: number;
   ty: number;
@@ -24,13 +26,15 @@ export class Projectile extends Phaser.GameObjects.Image {
     kind: TowerKey,
     stats: TowerStats,
     target: Enemy,
+    pierce = false,
   ) {
     super(scene, x, y, texture);
     this.kind = kind;
     this.stats = stats;
     this.target = target;
+    this.pierce = pierce;
     this.tx = target.pos.x;
-    this.ty = target.pos.y;
+    this.ty = target.aimY;
     this.startDist = Math.max(1, Math.hypot(this.tx - x, this.ty - y));
     this.arcs = kind === 'cannon';
     this.setDepth(DEPTH.projectile);
@@ -42,7 +46,7 @@ export class Projectile extends Phaser.GameObjects.Image {
     if (this.done) return false;
     if (this.target.targetable) {
       this.tx = this.target.pos.x;
-      this.ty = this.target.pos.y;
+      this.ty = this.target.aimY;
     }
     const dx = this.tx - this.x;
     const dy = this.ty - this.y;

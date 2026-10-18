@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { FONT, GAME_H, GAME_W } from '../config/constants';
 import { DIFFICULTIES, type DifficultyKey } from '../config/difficulty';
+import type { MapMode } from '../config/settings';
 import type { CustomLevel } from '../editor/customLevel';
+import { randomSeed } from '../systems/MapGenerator';
 import { Button } from '../ui/Button';
 
 interface GameOverData {
@@ -11,6 +13,8 @@ interface GameOverData {
   difficulty: DifficultyKey;
   /** The Creator level that was played, if any. */
   custom?: CustomLevel;
+  seed: number;
+  map: MapMode;
 }
 
 /** Overlay shown on top of the paused game when it ends. */
@@ -51,9 +55,14 @@ export class GameOverScene extends Phaser.Scene {
       this.scene.stop('Game');
       this.scene.start(scene, sceneData);
     };
-    const restart = () => leave('Game', { difficulty: data.difficulty, custom: data.custom });
+    const replay = (seed: number) => leave('Game', { difficulty: data.difficulty, custom: data.custom, seed, map: data.map });
+    const restart = () => replay(data.seed);
     new Button(this, { x: cx - 80, y: 262, w: 160, h: 32, label: 'PLAY AGAIN', variant: 'primary', onClick: restart });
     let y = 304;
+    if (!data.custom && data.map === 'random') {
+      new Button(this, { x: cx - 80, y, w: 160, h: 28, label: 'NEW MAP', variant: 'accent', onClick: () => replay(randomSeed()) });
+      y += 36;
+    }
     if (data.custom) {
       new Button(this, {
         x: cx - 80,

@@ -1,6 +1,6 @@
 import { COLS, ROWS, TILE } from './constants';
 
-export type TileType = 'grass' | 'path' | 'blocked';
+export type TileType = 'grass' | 'path' | 'shortcut' | 'blocked';
 export type DecorationKind = 'tree' | 'rock';
 export interface Decoration {
   col: number;
@@ -88,4 +88,39 @@ export function buildGrid(
     if (grid[d.row]?.[d.col] === 'grass') grid[d.row][d.col] = 'blocked';
   }
   return grid;
+}
+
+/** Every tile along a corner path, in walking order (including the off-screen start). */
+export function expandCorners(corners: [number, number][]): [number, number][] {
+  const tiles: [number, number][] = [];
+  for (let i = 0; i < corners.length - 1; i++) {
+    const [c0, r0] = corners[i];
+    const [c1, r1] = corners[i + 1];
+    const steps = Math.max(Math.abs(c1 - c0), Math.abs(r1 - r0));
+    for (let s = i === 0 ? 0 : 1; s <= steps; s++) {
+      tiles.push([c0 + Math.sign(c1 - c0) * s, r0 + Math.sign(r1 - r0) * s]);
+    }
+  }
+  return tiles;
+}
+
+/** Collapses a tile-by-tile walk back into corner points. */
+export function tilesToCorners(tiles: [number, number][]): [number, number][] {
+  if (tiles.length < 2) return [...tiles];
+  const out: [number, number][] = [tiles[0]];
+  for (let i = 1; i < tiles.length - 1; i++) {
+    const [pc, pr] = tiles[i - 1];
+    const [c, r] = tiles[i];
+    const [nc, nr] = tiles[i + 1];
+    if (c - pc !== nc - c || r - pr !== nr - r) out.push(tiles[i]);
+  }
+  out.push(tiles[tiles.length - 1]);
+  return out;
+}
+
+/** Length of a walk through pixel points. */
+export function routeLength(points: Point[]): number {
+  let d = 0;
+  for (let i = 1; i < points.length; i++) d += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+  return d;
 }
