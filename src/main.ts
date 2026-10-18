@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_H, GAME_W } from './config/constants';
 import { BootScene } from './scenes/BootScene';
+import { EditorScene } from './scenes/EditorScene';
 import { GameOverScene } from './scenes/GameOverScene';
 import { GameScene } from './scenes/GameScene';
 import { MenuScene } from './scenes/MenuScene';
@@ -15,7 +16,9 @@ const config: Phaser.Types.Core.GameConfig = {
   pixelArt: true,
   roundPixels: true,
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-  scene: [BootScene, MenuScene, GameScene, UIScene, GameOverScene],
+  // The DOM container lets the Creator show real text boxes for level names and share codes.
+  dom: { createContainer: true },
+  scene: [BootScene, MenuScene, GameScene, UIScene, GameOverScene, EditorScene],
 };
 
 /** Wait briefly for the pixel font so text doesn't render in the fallback first. */

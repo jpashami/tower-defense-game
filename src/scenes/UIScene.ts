@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { FONT, GAME_H, MAP_W, PANEL_W, TILE } from '../config/constants';
-import { TOWERS, TOWER_ORDER, type TowerDef, type TowerKey } from '../config/towers';
+import { TOWER_ORDER, type TowerDef, type TowerKey } from '../config/towers';
 import { Button } from '../ui/Button';
 import type { GameScene } from './GameScene';
 
@@ -27,6 +27,7 @@ export class UIScene extends Phaser.Scene {
   private startBtn!: Button;
   private speedBtn!: Button;
   private pauseBtn!: Button;
+  private quitBtn!: Button;
 
   constructor() {
     super('UI');
@@ -49,7 +50,8 @@ export class UIScene extends Phaser.Scene {
     this.moneyText = this.text(X + 88, 9, '', '#ffcd75');
     this.waveText = this.text(X + 2, 28, '');
     const d = this.gs.difficulty;
-    this.text(X + W - 2, 28, d.name.toUpperCase(), d.color).setOrigin(1, 0);
+    if (this.gs.custom) this.text(X + W - 2, 28, 'CUSTOM', '#73eff7').setOrigin(1, 0);
+    else this.text(X + W - 2, 28, d.name.toUpperCase(), d.color).setOrigin(1, 0);
 
     TOWER_ORDER.forEach((key, i) => this.makeShopItem(key, i, 48 + i * 52));
 
@@ -60,6 +62,15 @@ export class UIScene extends Phaser.Scene {
     this.sellBtn = new Button(this, { x: X + 4, y: 368, w: W - 8, h: 22, label: '', variant: 'danger', onClick: () => this.gs.sellSelected() });
     this.startBtn = new Button(this, { x: X, y: 404, w: W, h: 30, label: 'START WAVE', variant: 'primary', onClick: () => this.gs.startNextWave() });
     this.speedBtn = new Button(this, { x: X, y: 442, w: 68, h: 28, label: '', onClick: () => this.gs.toggleSpeed() });
+    this.quitBtn = new Button(this, {
+      x: X + 4,
+      y: 368,
+      w: W - 8,
+      h: 22,
+      label: this.gs.custom ? 'BACK TO CREATOR' : 'MAIN MENU',
+      variant: 'danger',
+      onClick: () => this.gs.quit(),
+    });
     this.pauseBtn = new Button(this, { x: X + W - 68, y: 442, w: 68, h: 28, label: '', onClick: () => this.gs.togglePause() });
   }
 
@@ -72,7 +83,7 @@ export class UIScene extends Phaser.Scene {
     this.waveText.setText(`WAVE ${Math.max(gs.waves.current, 1)}/${gs.waves.total}`);
 
     for (const item of this.shop) {
-      const affordable = money >= TOWERS[item.key].cost;
+      const affordable = money >= gs.towerDefs[item.key].cost;
       item.button.setEnabled(affordable && !gs.isOver).setActive(gs.placement.type === item.key);
       item.parts.forEach((p) => p.setAlpha(affordable ? 1 : 0.4));
     }
@@ -91,6 +102,18 @@ export class UIScene extends Phaser.Scene {
   private updateInfo(): void {
     const gs = this.gs;
     const t = gs.selected;
+    this.quitBtn.setVisible(gs.paused && !gs.isOver);
+    if (gs.paused && !gs.isOver) {
+      this.upgradeBtn.setVisible(false);
+      this.sellBtn.setVisible(false);
+      this.infoTitle.setText('PAUSED');
+      this.infoBody.setText(
+        this.gs.custom
+          ? 'Press PLAY to\ncarry on, or go\nback to change\nyour level.'
+          : 'Press PLAY to\ncarry on, or\nleave this game.',
+      );
+      return;
+    }
     if (t) {
       const next = t.isMaxLevel ? null : t.level + 1;
       this.infoTitle.setText(`${t.def.name.toUpperCase()} LV${t.level + 1}`);
@@ -108,7 +131,7 @@ export class UIScene extends Phaser.Scene {
 
     const placing = gs.placement.type;
     if (placing) {
-      const def = TOWERS[placing];
+      const def = gs.towerDefs[placing];
       this.infoTitle.setText(def.name.toUpperCase());
       this.infoBody.setText(`${def.description}\n\n${statLines(def, 0, null)}\n\nShift-click to\nbuild several.`);
       return;
@@ -120,7 +143,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   private makeShopItem(key: TowerKey, index: number, y: number): void {
-    const def = TOWERS[key];
+    const def = this.gs.towerDefs[key];
     const button = new Button(this, { x: X, y, w: W, h: 48, onClick: () => this.gs.beginPlacement(key) });
     const cy = y + 24;
     const base = this.add.image(X + 22, cy, def.baseTexture);

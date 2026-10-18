@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { FONT } from '../config/constants';
 
-export type ButtonVariant = 'default' | 'primary' | 'danger';
+export type ButtonVariant = 'default' | 'primary' | 'danger' | 'accent';
 
 export interface ButtonOptions {
   x: number;
@@ -18,6 +18,7 @@ const COLORS: Record<ButtonVariant, { fill: number; light: number; dark: number 
   default: { fill: 0x333c57, light: 0x566c86, dark: 0x1a1c2c },
   primary: { fill: 0x38b764, light: 0xa7f070, dark: 0x257179 },
   danger: { fill: 0xb13e53, light: 0xef7d57, dark: 0x5d275d },
+  accent: { fill: 0x3b5dc9, light: 0x41a6f6, dark: 0x29366f },
 };
 const ACTIVE = { fill: 0x257179, light: 0x73eff7, dark: 0x1a1c2c };
 const DISABLED = { fill: 0x262b3e, light: 0x333c57, dark: 0x1a1c2c };
@@ -104,6 +105,12 @@ export class Button {
       if (this.zone.input) this.zone.input.enabled = visible;
     }
     return this;
+  }
+
+  destroy(): void {
+    this.gfx.destroy();
+    this.label?.destroy();
+    this.zone.destroy();
   }
 
   private redraw(): void {

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { FONT, GAME_H, GAME_W } from '../config/constants';
 import { DIFFICULTIES, type DifficultyKey } from '../config/difficulty';
+import type { CustomLevel } from '../editor/customLevel';
 import { Button } from '../ui/Button';
 
 interface GameOverData {
@@ -8,6 +9,8 @@ interface GameOverData {
   wave: number;
   lives: number;
   difficulty: DifficultyKey;
+  /** The Creator level that was played, if any. */
+  custom?: CustomLevel;
 }
 
 /** Overlay shown on top of the paused game when it ends. */
@@ -40,26 +43,30 @@ export class GameOverScene extends Phaser.Scene {
       ? `The castle stands!\n${data.lives} lives left.`
       : `The castle fell on wave ${data.wave}.`;
     this.add.text(cx, 206, sub, style(8, '#f4f4f4')).setOrigin(0.5).setLineSpacing(8);
-    this.add.text(cx, 240, `DIFFICULTY: ${level.name.toUpperCase()}`, style(8, level.color)).setOrigin(0.5);
+    if (data.custom) this.add.text(cx, 240, `LEVEL: ${data.custom.name}`, style(8, '#73eff7')).setOrigin(0.5);
+    else this.add.text(cx, 240, `DIFFICULTY: ${level.name.toUpperCase()}`, style(8, level.color)).setOrigin(0.5);
 
-    const restart = () => {
+    const leave = (scene: string, sceneData?: object) => {
       this.scene.stop('UI');
       this.scene.stop('Game');
-      this.scene.start('Game', { difficulty: data.difficulty });
+      this.scene.start(scene, sceneData);
     };
+    const restart = () => leave('Game', { difficulty: data.difficulty, custom: data.custom });
     new Button(this, { x: cx - 80, y: 262, w: 160, h: 32, label: 'PLAY AGAIN', variant: 'primary', onClick: restart });
-    new Button(this, {
-      x: cx - 80,
-      y: 304,
-      w: 160,
-      h: 28,
-      label: 'MAIN MENU',
-      onClick: () => {
-        this.scene.stop('UI');
-        this.scene.stop('Game');
-        this.scene.start('Menu');
-      },
-    });
+    let y = 304;
+    if (data.custom) {
+      new Button(this, {
+        x: cx - 80,
+        y,
+        w: 160,
+        h: 28,
+        label: 'EDIT LEVEL',
+        variant: 'accent',
+        onClick: () => leave('Editor', { level: data.custom }),
+      });
+      y += 36;
+    }
+    new Button(this, { x: cx - 80, y, w: 160, h: 28, label: 'MAIN MENU', onClick: () => leave('Menu') });
     this.input.keyboard?.once('keydown-ENTER', restart);
   }
 }

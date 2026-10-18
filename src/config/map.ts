@@ -1,6 +1,12 @@
 import { COLS, ROWS, TILE } from './constants';
 
 export type TileType = 'grass' | 'path' | 'blocked';
+export type DecorationKind = 'tree' | 'rock';
+export interface Decoration {
+  col: number;
+  row: number;
+  kind: DecorationKind;
+}
 export interface Point {
   x: number;
   y: number;
@@ -27,7 +33,7 @@ export const PATH_TILES: [number, number][] = [
 ];
 
 /** Trees and rocks block building. Any entry that lands on the path is ignored. */
-export const DECORATIONS: { col: number; row: number; kind: 'tree' | 'rock' }[] = [
+export const DECORATIONS: Decoration[] = [
   { col: 0, row: 0, kind: 'tree' },
   { col: 1, row: 0, kind: 'tree' },
   { col: 7, row: 0, kind: 'tree' },
@@ -54,12 +60,15 @@ export const tileCenter = (col: number, row: number): Point => ({
 });
 
 /** Path corners in pixel coordinates (tile centres). */
-export function pathPoints(): Point[] {
-  return PATH_TILES.map(([c, r]) => tileCenter(c, r));
+export function pathPoints(path: [number, number][] = PATH_TILES): Point[] {
+  return path.map(([c, r]) => tileCenter(c, r));
 }
 
-/** Builds the tile grid: path from PATH_TILES, blocked from DECORATIONS, the rest grass. */
-export function buildGrid(): TileType[][] {
+/** Builds the tile grid: path from the corners, blocked from decorations, the rest grass. */
+export function buildGrid(
+  path: [number, number][] = PATH_TILES,
+  decorations: Decoration[] = DECORATIONS,
+): TileType[][] {
   const grid: TileType[][] = Array.from({ length: ROWS }, () =>
     Array.from({ length: COLS }, (): TileType => 'grass'),
   );
@@ -67,15 +76,15 @@ export function buildGrid(): TileType[][] {
     if (c >= 0 && c < COLS && r >= 0 && r < ROWS) grid[r][c] = t;
   };
 
-  for (let i = 0; i < PATH_TILES.length - 1; i++) {
-    const [c0, r0] = PATH_TILES[i];
-    const [c1, r1] = PATH_TILES[i + 1];
+  for (let i = 0; i < path.length - 1; i++) {
+    const [c0, r0] = path[i];
+    const [c1, r1] = path[i + 1];
     const steps = Math.max(Math.abs(c1 - c0), Math.abs(r1 - r0));
     for (let s = 0; s <= steps; s++) {
       mark(c0 + Math.sign(c1 - c0) * s, r0 + Math.sign(r1 - r0) * s, 'path');
     }
   }
-  for (const d of DECORATIONS) {
+  for (const d of decorations) {
     if (grid[d.row]?.[d.col] === 'grass') grid[d.row][d.col] = 'blocked';
   }
   return grid;

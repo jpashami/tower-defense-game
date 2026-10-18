@@ -41,6 +41,22 @@ Pick a difficulty on the title screen with the buttons or the left and right arr
 | P | Pause |
 | Esc / right-click | Cancel |
 
+Pause the game to see a button for leaving it.
+
+## Make your own level
+
+Press **CREATE** on the title screen to open the Creator. No typing needed, apart from the level's name.
+
+1. **Paint the path.** With **PATH** picked, click squares one after another, starting on the left edge. Glowing squares show where the path can go next. You can also drag. The last square becomes the castle. **UNDO** takes back the last square, and clicking an earlier square cuts the path short there.
+2. **Decorate.** Pick **TREE** or **ROCK** and click grass to place one; click it again to remove it. **ERASE** clears trees and rocks. Nobody can build on trees or rocks.
+3. **Set up the waves.** **WAVES** opens a panel to choose how many waves there are (1 to 20), how much gold and how many lives you start with, and how many grunts, runners and brutes each wave sends. Click a bar in the chart to pick a wave.
+4. **Tune the towers.** **TOWERS** changes each tower's damage, range and cost. Upgrades get better by the same amount.
+5. Click the name at the top to rename the level, then press **PLAY** to try it. When the game ends, or from the pause menu, you can go straight back to editing.
+
+**SAVE** keeps up to 6 levels in this browser. **LEVELS** opens or deletes them. The level you're working on is also kept between visits, even if you haven't saved it. **NEW** starts from an empty map or a copy of the classic map.
+
+**SHARE** shows a short code such as `TD1.DRAGON_ROAD.46.L.2R9D8RA.E4R37R.600A01.0BD090QB0I03A0C.FD`. Send it to a friend. They paste it into the same box and press **LOAD CODE**. Creator levels always play with Normal rules, using the gold and lives you picked.
+
 ## Towers and enemies
 
 | Tower | Cost | Role |
@@ -67,10 +83,12 @@ src/
     towers.ts          Tower stats, costs and upgrade levels
     enemies.ts         Enemy stats
     waves.ts           Wave composition and clear bonus
+    level.ts           LevelDef (map, waves, tower tuning) and the built-in level
+  editor/              Creator levels: format, validation, share codes, saving
   art/                 Pixel art drawn in code from shapes, no image files
   entities/            Enemy, Tower, Projectile
   systems/             Wave spawning, economy, map drawing, placement, effects
-  scenes/              Boot, Menu, Game, UI (HUD), GameOver
+  scenes/              Boot, Menu, Game, UI (HUD), GameOver, Editor (the Creator)
   ui/Button.ts         Pixel-style button
 ```
 

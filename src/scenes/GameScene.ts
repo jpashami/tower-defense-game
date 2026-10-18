@@ -9,9 +9,11 @@ import {
   type DifficultyKey,
 } from '../config/difficulty';
 import { ENEMIES, type EnemyKey } from '../config/enemies';
-import { buildGrid, pathPoints, PATH_TILES, tileCenter, type Point, type TileType } from '../config/map';
-import { TOWERS, TOWER_ORDER, type TowerKey } from '../config/towers';
-import { WAVES, waveClearBonus } from '../config/waves';
+import { BUILTIN_LEVEL, levelTowers, type LevelDef } from '../config/level';
+import { buildGrid, pathPoints, tileCenter, type Point, type TileType } from '../config/map';
+import { TOWER_ORDER, type TowerDef, type TowerKey } from '../config/towers';
+import { waveClearBonus } from '../config/waves';
+import { toLevelDef, type CustomLevel } from '../editor/customLevel';
 import { Enemy } from '../entities/Enemy';
 import { Projectile } from '../entities/Projectile';
 import { Tower } from '../entities/Tower';
@@ -23,6 +25,12 @@ import { WaveManager } from '../systems/WaveManager';
 
 export type Phase = 'build' | 'wave' | 'won' | 'lost';
 
+export interface GameData {
+  difficulty?: DifficultyKey;
+  /** A Creator level to play instead of the built-in one. */
+  custom?: CustomLevel;
+}
+
 /**
  * The battlefield. Owns all game state; the UI scene reads it every frame
  * and calls the public methods below in response to button presses.
@@ -31,6 +39,11 @@ export class GameScene extends Phaser.Scene {
   economy!: Economy;
   waves!: WaveManager;
   difficulty!: DifficultyDef;
+  level!: LevelDef;
+  /** Set when playing a Creator level, so the player can go back to editing it. */
+  custom: CustomLevel | null = null;
+  /** Tower stats for this level, after any Creator tuning. */
+  towerDefs!: Record<TowerKey, TowerDef>;
   phase: Phase = 'build';
   /** Seconds until the next wave starts on its own; 0 means waiting for the player. */
   countdown = 0;
@@ -52,9 +65,13 @@ export class GameScene extends Phaser.Scene {
     super('Game');
   }
 
-  create(data?: { difficulty?: DifficultyKey }): void {
+  create(data?: GameData): void {
     // The scene object is reused on restart, so reset everything here.
-    this.difficulty = DIFFICULTIES[data?.difficulty ?? loadDifficulty()];
+    // Creator levels set their own gold and lives and play by Normal rules.
+    this.custom = data?.custom ?? null;
+    this.level = this.custom ? toLevelDef(this.custom) : BUILTIN_LEVEL;
+    this.difficulty = DIFFICULTIES[this.custom ? 'normal' : (data?.difficulty ?? loadDifficulty())];
+    this.towerDefs = levelTowers(this.level);
     this.enemies = [];
     this.towers = [];
     this.projectiles = [];
@@ -65,11 +82,15 @@ export class GameScene extends Phaser.Scene {
     this.speed = 1;
     this.paused = false;
 
-    this.grid = buildGrid();
-    this.path = pathPoints();
-    renderMap(this, this.grid);
-    this.economy = new Economy(this.difficulty.startMoney, this.difficulty.startLives);
-    this.waves = new WaveManager(WAVES, this.difficulty.countMult);
+    const { level } = this;
+    this.grid = buildGrid(level.path, level.decorations);
+    this.path = pathPoints(level.path);
+    renderMap(this, this.grid, level.path, level.decorations);
+    this.economy = new Economy(
+      level.startMoney ?? this.difficulty.startMoney,
+      level.startLives ?? this.difficulty.startLives,
+    );
+    this.waves = new WaveManager(level.waves, this.difficulty.countMult);
     this.bars = this.add.graphics().setDepth(DEPTH.bars);
     this.rangeGfx = this.add.graphics().setDepth(DEPTH.range);
     this.placement = new PlacementController(this);
@@ -90,7 +111,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.scene.launch('UI');
-    banner(this, MAP_W / 2, MAP_H / 2, 'BUILD YOUR\nDEFENCES', '#ffcd75');
+    const intro = this.custom ? `${level.name}\n\nBUILD YOUR\nDEFENCES` : 'BUILD YOUR\nDEFENCES';
+    banner(this, MAP_W / 2, MAP_H / 2, intro, '#ffcd75');
 
     if (import.meta.env.DEV) (window as unknown as { gameScene: GameScene }).gameScene = this;
   }
@@ -154,6 +176,13 @@ export class GameScene extends Phaser.Scene {
 
   togglePause(): void {
     if (!this.isOver) this.paused = !this.paused;
+  }
+
+  /** Leaves the level: back to the Creator for its levels, else the title screen. */
+  quit(): void {
+    this.scene.stop('UI');
+    if (this.custom) this.scene.start('Editor', { level: this.custom });
+    else this.scene.start('Menu');
   }
 
   get isOver(): boolean {
@@ -244,7 +273,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private cleanupEnemies(): void {
-    const castle = tileCenter(...PATH_TILES[PATH_TILES.length - 1]);
+    const castle = tileCenter(...this.level.path[this.level.path.length - 1]);
     this.enemies = this.enemies.filter((e) => {
       if (e.dead) {
         const reward = killReward(this.difficulty, e.def.reward);
@@ -289,6 +318,7 @@ export class GameScene extends Phaser.Scene {
         wave: this.waves.current,
         lives: this.economy.lives,
         difficulty: this.difficulty.key,
+        custom: this.custom ?? undefined,
       });
       this.scene.pause();
     });
@@ -333,7 +363,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private tryPlace(type: TowerKey, col: number, row: number): boolean {
-    const def = TOWERS[type];
+    const def = this.towerDefs[type];
     const { x, y } = tileCenter(col, row);
     if (!this.isBuildable(col, row)) {
       floatText(this, x, y - 12, "CAN'T BUILD", '#b13e53');
@@ -355,7 +385,7 @@ export class GameScene extends Phaser.Scene {
     g.clear();
     const { type, hover } = this.placement;
     if (type && hover) {
-      const def = TOWERS[type];
+      const def = this.towerDefs[type];
       const ok = this.isBuildable(hover.col, hover.row) && this.economy.canAfford(def.cost);
       this.placement.setValid(ok);
       const color = ok ? 0xa7f070 : 0xb13e53;

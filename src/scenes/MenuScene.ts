@@ -68,7 +68,7 @@ export class MenuScene extends Phaser.Scene {
     this.setDifficulty(this.difficulty);
 
     const play = new Button(this, {
-      x: cx - 80,
+      x: cx - 168,
       y: 282,
       w: 160,
       h: 36,
@@ -78,6 +78,17 @@ export class MenuScene extends Phaser.Scene {
       onClick: () => this.startGame(),
     });
     play.label?.setFontSize(16);
+    const create = new Button(this, {
+      x: cx + 8,
+      y: 282,
+      w: 160,
+      h: 36,
+      label: 'CREATE',
+      variant: 'accent',
+      depth: 21,
+      onClick: () => this.scene.start('Editor'),
+    });
+    create.label?.setFontSize(16);
 
     title(352, 'Click a tower in the shop, then a grass tile.\nClick a built tower to upgrade or sell it.', 8, '#f4f4f4').setLineSpacing(8);
     title(400, 'KEYS  1-3 build   U upgrade   S sell\nSPACE next wave   F speed   P pause   ESC cancel', 8, '#566c86').setLineSpacing(8);
