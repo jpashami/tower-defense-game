@@ -22,13 +22,15 @@ export class Enemy extends Phaser.GameObjects.Image {
   private flashTimer = 0;
   private readonly shadow: Phaser.GameObjects.Image;
   private walkFrame = -1;
+  private readonly speed: number;
 
-  constructor(scene: Phaser.Scene, def: EnemyDef, path: Point[], hpMultiplier: number) {
+  constructor(scene: Phaser.Scene, def: EnemyDef, path: Point[], hpMultiplier: number, speedMultiplier = 1) {
     super(scene, path[0].x, path[0].y, `${def.texture}_0`);
     this.def = def;
     this.path = path;
     this.pos = { x: path[0].x, y: path[0].y };
     this.maxHp = Math.round(def.hp * hpMultiplier);
+    this.speed = def.speed * speedMultiplier;
     this.hp = this.maxHp;
     this.shadow = scene.add.image(this.pos.x, this.pos.y + 13, 'shadow').setDepth(DEPTH.deco + 0.5);
     scene.add.existing(this);
@@ -49,7 +51,7 @@ export class Enemy extends Phaser.GameObjects.Image {
     }
     if (this.flashTimer > 0) this.flashTimer -= dt;
 
-    let move = this.def.speed * this.slowFactor * dt;
+    let move = this.speed * this.slowFactor * dt;
     while (move > 0 && this.nextIndex < this.path.length) {
       const target = this.path[this.nextIndex];
       const dx = target.x - this.pos.x;

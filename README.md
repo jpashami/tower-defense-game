@@ -24,7 +24,7 @@ Pick a difficulty on the title screen with the buttons or the left and right arr
 | --- | --- | --- | --- |
 | Easy | 30 | 200 | Weaker, and pay 20% more gold |
 | Normal | 20 | 150 | The intended challenge |
-| Hard | 10 | 125 | Tougher, grow faster each wave, and pay 10% less gold |
+| Hard | 10 | 125 | 20% faster, 15% more of them, much tougher each wave, and pay 20% less gold |
 
 - Pick a tower in the shop on the right, then click a grass tile to build it. Shift-click builds several.
 - Click a built tower to see its range, upgrade it, or sell it for 70% of what you spent.
@@ -79,7 +79,7 @@ src/
 Everything is table-driven, so most changes are edits to files in `src/config`.
 
 - **Balance**: change numbers in `towers.ts`, `enemies.ts` or `waves.ts`.
-- **Difficulty**: change starting gold, lives, enemy health growth and kill rewards per level in `difficulty.ts`.
+- **Difficulty**: change starting gold, lives, enemy health growth, speed, wave size and kill rewards per level in `difficulty.ts`.
 - **New wave**: add an entry to `WAVES` in `waves.ts`. The game picks up the new total automatically.
 - **New path**: edit `PATH_TILES` in `map.ts`. Corners must be in a straight horizontal or vertical line from the previous one.
 - **New upgrade tier**: add another entry to a tower's `levels` and its cost to `upgradeCosts`.

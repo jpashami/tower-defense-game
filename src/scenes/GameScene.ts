@@ -69,7 +69,7 @@ export class GameScene extends Phaser.Scene {
     this.path = pathPoints();
     renderMap(this, this.grid);
     this.economy = new Economy(this.difficulty.startMoney, this.difficulty.startLives);
-    this.waves = new WaveManager(WAVES);
+    this.waves = new WaveManager(WAVES, this.difficulty.countMult);
     this.bars = this.add.graphics().setDepth(DEPTH.bars);
     this.rangeGfx = this.add.graphics().setDepth(DEPTH.range);
     this.placement = new PlacementController(this);
@@ -212,7 +212,8 @@ export class GameScene extends Phaser.Scene {
   // ---------- Internals ----------
 
   private spawnEnemy(key: EnemyKey): void {
-    this.enemies.push(new Enemy(this, ENEMIES[key], this.path, enemyHpMultiplier(this.difficulty, this.waves.current)));
+    const hp = enemyHpMultiplier(this.difficulty, this.waves.current);
+    this.enemies.push(new Enemy(this, ENEMIES[key], this.path, hp, this.difficulty.speedMult));
   }
 
   private fire(tower: Tower, target: Enemy): void {

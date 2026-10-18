@@ -12,6 +12,10 @@ export interface DifficultyDef {
   hpGrowth: number;
   /** Multiplier on gold paid per kill. */
   rewardMult: number;
+  /** Multiplier on enemy walking speed. */
+  speedMult: number;
+  /** Multiplier on how many enemies each wave sends (spawned proportionally faster). */
+  countMult: number;
   /** HUD text colour. */
   color: string;
 }
@@ -26,6 +30,8 @@ export const DIFFICULTIES: Record<DifficultyKey, DifficultyDef> = {
     hpBase: 0.85,
     hpGrowth: 0.15,
     rewardMult: 1.2,
+    speedMult: 1,
+    countMult: 1,
     color: '#a7f070',
   },
   normal: {
@@ -37,17 +43,21 @@ export const DIFFICULTIES: Record<DifficultyKey, DifficultyDef> = {
     hpBase: 1,
     hpGrowth: 0.25,
     rewardMult: 1,
+    speedMult: 1,
+    countMult: 1,
     color: '#ffcd75',
   },
   hard: {
     key: 'hard',
     name: 'Hard',
-    description: 'Tougher enemies, smaller rewards.',
+    description: 'More, faster, tougher enemies.',
     startMoney: 125,
     startLives: 10,
-    hpBase: 1.15,
-    hpGrowth: 0.32,
-    rewardMult: 0.9,
+    hpBase: 1,
+    hpGrowth: 0.46,
+    rewardMult: 0.8,
+    speedMult: 1.2,
+    countMult: 1.15,
     color: '#ef7d57',
   },
 };
