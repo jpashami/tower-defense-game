@@ -1,4 +1,6 @@
+import { Capacitor } from '@capacitor/core';
 import Phaser from 'phaser';
+import { registerSW } from 'virtual:pwa-register';
 import { GAME_H, GAME_W } from './config/constants';
 import { BootScene } from './scenes/BootScene';
 import { EditorScene } from './scenes/EditorScene';
@@ -29,7 +31,7 @@ async function start(): Promise<void> {
       new Promise((resolve) => setTimeout(resolve, 2500)),
     ]);
   } catch {
-    // Offline: fall back to monospace.
+    // Font loading failed: fall back to monospace.
   }
   const game = new Phaser.Game(config);
   // Dev server only: the balance-testing autoplayer (see src/dev/autoplay.ts).
@@ -37,3 +39,6 @@ async function start(): Promise<void> {
 }
 
 void start();
+
+// Web build: the service worker caches the game so it installs to the home screen and plays offline.
+if (import.meta.env.PROD && !Capacitor.isNativePlatform()) registerSW({ immediate: true });

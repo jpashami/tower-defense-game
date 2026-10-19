@@ -4,18 +4,25 @@ import { ENEMIES } from '../config/enemies';
 import { SPELLS, SPELL_ORDER, type SpellKey } from '../config/spells';
 import { TOWER_ORDER, type TargetMode, type TowerDef, type TowerKey } from '../config/towers';
 import { Button } from '../ui/Button';
+import { isTouchDevice } from '../ui/touch';
 import type { GameScene } from './GameScene';
 
 const X = MAP_W + 8;
 const W = PANEL_W - 16;
 
-// Panel layout (y positions).
+// Panel layout (y positions). Buttons are 28 pixels tall so they are easy to hit with a finger.
 const SHOP_Y = 40;
-const SHOP_STEP = 33;
+const SHOP_STEP = 32;
 const SHOP_H = 30;
-const INFO_Y = 208;
-const INFO_H = 110;
+const INFO_Y = 204;
+const INFO_H = 104;
 const PREVIEW_ROWS = 6;
+const BTN_H = 28;
+const ROW_STEP = BTN_H + 4;
+const ACTION_Y = INFO_Y + INFO_H + 4;
+const SPELL_Y = ACTION_Y + 2 * ROW_STEP;
+const START_Y = SPELL_Y + ROW_STEP;
+const SPEED_Y = START_Y + ROW_STEP;
 
 const TARGET_LABEL: Record<TargetMode, string> = { first: 'FIRST', strongest: 'STRONG', closest: 'CLOSE' };
 
@@ -46,6 +53,7 @@ export class UIScene extends Phaser.Scene {
   private speedBtn!: Button;
   private pauseBtn!: Button;
   private quitBtn!: Button;
+  private cancelBtn!: Button;
 
   constructor() {
     super('UI');
@@ -83,14 +91,17 @@ export class UIScene extends Phaser.Scene {
     }
 
     const half = (W - 4) / 2;
-    this.upgradeBtn = new Button(this, { x: X, y: 322, w: W, h: 18, label: '', variant: 'primary', onClick: () => this.gs.upgradeSelected() });
-    this.sellBtn = new Button(this, { x: X, y: 344, w: half, h: 18, label: '', variant: 'danger', onClick: () => this.gs.sellSelected() });
-    this.targetBtn = new Button(this, { x: X + half + 4, y: 344, w: half, h: 18, label: '', onClick: () => this.gs.cycleTargetSelected() });
+    const sellY = ACTION_Y + ROW_STEP;
+    this.upgradeBtn = new Button(this, { x: X, y: ACTION_Y, w: W, h: BTN_H, label: '', variant: 'primary', onClick: () => this.gs.upgradeSelected() });
+    this.sellBtn = new Button(this, { x: X, y: sellY, w: half, h: BTN_H, label: '', variant: 'danger', onClick: () => this.gs.sellSelected() });
+    this.targetBtn = new Button(this, { x: X + half + 4, y: sellY, w: half, h: BTN_H, label: '', onClick: () => this.gs.cycleTargetSelected() });
+    // Phones have no right-click or Esc, so placing a tower or aiming the meteor gets a button to stop.
+    this.cancelBtn = new Button(this, { x: X, y: ACTION_Y, w: W, h: BTN_H, label: 'CANCEL', variant: 'danger', onClick: () => this.gs.cancelAll() });
     this.quitBtn = new Button(this, {
       x: X,
-      y: 322,
+      y: ACTION_Y,
       w: W,
-      h: 18,
+      h: BTN_H,
       label: this.gs.custom ? 'BACK TO CREATOR' : 'MAIN MENU',
       variant: 'danger',
       onClick: () => this.gs.quit(),
@@ -100,19 +111,19 @@ export class UIScene extends Phaser.Scene {
     SPELL_ORDER.forEach((key, i) => {
       this.spellBtns[key] = new Button(this, {
         x: X + i * (half + 4),
-        y: 368,
+        y: SPELL_Y,
         w: half,
-        h: 22,
+        h: BTN_H,
         label: '',
         variant: 'accent',
         onClick: () => this.gs.castSpell(key),
       });
     });
 
-    this.startBtn = new Button(this, { x: X, y: 396, w: W, h: 28, label: 'START WAVE', variant: 'primary', onClick: () => this.gs.startNextWave() });
-    this.speedBtn = new Button(this, { x: X, y: 430, w: 68, h: 24, label: '', onClick: () => this.gs.toggleSpeed() });
-    this.pauseBtn = new Button(this, { x: X + W - 68, y: 430, w: 68, h: 24, label: '', onClick: () => this.gs.togglePause() });
-    this.text(X + W / 2, 462, 'Q METEOR  W FREEZE', '#566c86').setOrigin(0.5, 0);
+    this.startBtn = new Button(this, { x: X, y: START_Y, w: W, h: BTN_H, label: 'START WAVE', variant: 'primary', onClick: () => this.gs.startNextWave() });
+    this.speedBtn = new Button(this, { x: X, y: SPEED_Y, w: half, h: BTN_H, label: '', onClick: () => this.gs.toggleSpeed() });
+    this.pauseBtn = new Button(this, { x: X + half + 4, y: SPEED_Y, w: half, h: BTN_H, label: '', onClick: () => this.gs.togglePause() });
+    if (!isTouchDevice()) this.text(X + W / 2, SPEED_Y + BTN_H + 3, 'Q METEOR  W FREEZE', '#566c86').setOrigin(0.5, 0);
   }
 
   update(): void {
@@ -158,6 +169,7 @@ export class UIScene extends Phaser.Scene {
     const t = gs.selected;
     const paused = gs.paused && !gs.isOver;
     this.quitBtn.setVisible(paused);
+    this.cancelBtn.setVisible(!paused && gs.isChoosing && !gs.isOver);
     this.showPreview(false);
     this.upgradeBtn.setVisible(false);
     this.sellBtn.setVisible(false);
@@ -170,7 +182,11 @@ export class UIScene extends Phaser.Scene {
     }
     if (gs.aimingMeteor) {
       this.infoTitle.setText('METEOR');
-      this.infoBody.setText('Click the map\nto drop it.\n\nRight-click or\nESC to cancel.');
+      this.infoBody.setText(
+        gs.touchMode
+          ? 'Tap the map to\naim, then tap\ninside the\ncircle to drop\nit.'
+          : 'Click the map\nto drop it.\n\nRight-click or\nESC to cancel.',
+      );
       return;
     }
     if (t) {
@@ -191,7 +207,10 @@ export class UIScene extends Phaser.Scene {
       const def = gs.towerDefs[placing];
       this.infoTitle.setText(def.name.toUpperCase());
       const s0 = def.levels[0];
-      this.infoBody.setText(`${def.description}\n\nDMG ${s0.damage} RNG ${(s0.range / TILE).toFixed(1)}`);
+      const stats = `DMG ${s0.damage} RNG ${(s0.range / TILE).toFixed(1)}`;
+      // On touch the first tap only previews, so say how to build.
+      const hint = gs.touchMode ? (gs.placement.hover ? 'Tap the same\ntile again to\nbuild it.' : 'Tap a grass\ntile to see\nwhere it goes.') : '';
+      this.infoBody.setText(hint ? `${stats}\n\n${hint}` : `${def.description}\n\n${stats}`);
       return;
     }
     const preview = gs.nextWavePreview();

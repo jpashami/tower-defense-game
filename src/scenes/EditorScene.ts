@@ -23,6 +23,7 @@ import { deleteLevel, isSaved, listLevels, loadDraft, MAX_SAVED, saveDraft, save
 import { decodeLevel, encodeLevel } from '../editor/shareCode';
 import { renderMap } from '../systems/MapRenderer';
 import { Button, type ButtonOptions } from '../ui/Button';
+import { isTouchDevice } from '../ui/touch';
 
 type Tool = 'path' | 'tree' | 'rock' | 'erase';
 interface Cell {
@@ -116,7 +117,11 @@ export class EditorScene extends Phaser.Scene {
       if (over.length === 0) this.onPointerDown(p);
     });
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => this.onPointerMove(p));
-    this.input.on('pointerup', () => (this.dragMode = null));
+    this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
+      this.dragMode = null;
+      // A lifted finger is not hovering anywhere.
+      if (p.wasTouch) this.hover = null;
+    });
 
     this.redrawMap();
     this.refresh();
@@ -150,7 +155,7 @@ export class EditorScene extends Phaser.Scene {
     g.lineStyle(1, 0x333c57, 1).strokeRect(X + 0.5, 224.5, W - 1, 103);
 
     this.text(X + 2, 7, 'CREATOR', '#ffcd75');
-    this.nameBtn = new Button(this, { x: X, y: 20, w: W, h: 24, label: '', onClick: () => this.openName() });
+    this.nameBtn = new Button(this, { x: X, y: 20, w: W, h: 28, label: '', onClick: () => this.openName() });
 
     const tools: { tool: Tool; label: string; icon?: string }[] = [
       { tool: 'path', label: 'PATH', icon: 'tile_path_0' },
@@ -169,12 +174,12 @@ export class EditorScene extends Phaser.Scene {
       this.toolButtons.set(tool, b);
     });
 
-    this.undoBtn = new Button(this, { x: X, y: 124, w: HALF, h: 26, label: 'UNDO', onClick: () => this.undoPath() });
+    this.undoBtn = new Button(this, { x: X, y: 124, w: HALF, h: 28, label: 'UNDO', onClick: () => this.undoPath() });
     this.clearBtn = new Button(this, {
       x: X + HALF + 8,
       y: 124,
       w: HALF,
-      h: 26,
+      h: 28,
       label: 'CLEAR',
       variant: 'danger',
       onClick: () => this.clearPath(),
@@ -183,7 +188,7 @@ export class EditorScene extends Phaser.Scene {
       x: X,
       y: 158,
       w: W,
-      h: 26,
+      h: 28,
       label: '',
       variant: 'accent',
       onClick: () => this.openOverlay(() => this.buildWaves()),
@@ -192,7 +197,7 @@ export class EditorScene extends Phaser.Scene {
       x: X,
       y: 190,
       w: W,
-      h: 26,
+      h: 28,
       label: 'TOWERS',
       variant: 'accent',
       onClick: () => this.openOverlay(() => this.buildTowers()),
@@ -201,13 +206,13 @@ export class EditorScene extends Phaser.Scene {
     this.statusText = this.text(X + 6, 232, '');
     this.hintText = this.text(X + 6, 250, '', '#d0dae2').setLineSpacing(4).setWordWrapWidth(W - 12);
 
-    this.saveBtn = new Button(this, { x: X, y: 334, w: HALF, h: 26, label: 'SAVE', onClick: () => this.save() });
-    new Button(this, { x: X + HALF + 8, y: 334, w: HALF, h: 26, label: 'LEVELS', onClick: () => this.openLevels() });
-    new Button(this, { x: X, y: 366, w: HALF, h: 26, label: 'SHARE', onClick: () => this.openShare() });
-    new Button(this, { x: X + HALF + 8, y: 366, w: HALF, h: 26, label: 'NEW', onClick: () => this.openNew() });
+    this.saveBtn = new Button(this, { x: X, y: 334, w: HALF, h: 28, label: 'SAVE', onClick: () => this.save() });
+    new Button(this, { x: X + HALF + 8, y: 334, w: HALF, h: 28, label: 'LEVELS', onClick: () => this.openLevels() });
+    new Button(this, { x: X, y: 366, w: HALF, h: 28, label: 'SHARE', onClick: () => this.openShare() });
+    new Button(this, { x: X + HALF + 8, y: 366, w: HALF, h: 28, label: 'NEW', onClick: () => this.openNew() });
     const play = new Button(this, { x: X, y: 400, w: W, h: 34, label: 'PLAY', variant: 'primary', onClick: () => this.play() });
     play.label?.setFontSize(16);
-    new Button(this, { x: X, y: 442, w: W, h: 26, label: 'MAIN MENU', onClick: () => this.scene.start('Menu') });
+    new Button(this, { x: X, y: 442, w: W, h: 28, label: 'MAIN MENU', onClick: () => this.scene.start('Menu') });
   }
 
   /** Updates the panel after any change. */
@@ -224,7 +229,7 @@ export class EditorScene extends Phaser.Scene {
     const n = L.path.length;
     if (n === 0) this.statusText.setText('NO PATH YET').setColor('#ef7d57');
     else this.statusText.setText(`PATH: ${n} TILES`).setColor(n < LIMITS.minPath ? '#ef7d57' : '#a7f070');
-    this.hintText.setText(TOOL_HINTS[this.tool]);
+    this.hintText.setText(isTouchDevice() ? TOOL_HINTS[this.tool].replace(/Click/g, 'Tap') : TOOL_HINTS[this.tool]);
   }
 
   /** Called after every edit: redraw, refresh and keep the draft safe. */
@@ -556,7 +561,7 @@ export class EditorScene extends Phaser.Scene {
     );
 
     // Bar chart of every wave, stacked by enemy type. Click a bar to edit that wave.
-    this.oText(CX, 114, 'CLICK A BAR TO CHANGE THAT WAVE', 8, '#566c86');
+    this.oText(CX, 114, `${isTouchDevice() ? 'TAP' : 'CLICK'} A BAR TO CHANGE THAT WAVE`, 8, '#566c86');
     const slot = 36;
     const bottom = 222;
     const maxH = 88;

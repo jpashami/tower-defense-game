@@ -36,6 +36,7 @@ import { renderMap } from '../systems/MapRenderer';
 import { randomSeed, type ShortcutDef } from '../systems/MapGenerator';
 import { PlacementController } from '../systems/PlacementController';
 import { WaveManager } from '../systems/WaveManager';
+import { isTouchDevice } from '../ui/touch';
 
 export type Phase = 'build' | 'wave' | 'won' | 'lost';
 
@@ -81,6 +82,8 @@ export class GameScene extends Phaser.Scene {
   spellCooldown: Record<SpellKey, number> = { meteor: 0, freeze: 0 };
   /** True while the player is choosing where to drop a meteor. */
   aimingMeteor = false;
+  /** True when the last tap or click came from a finger, so the HUD shows tap hints. */
+  touchMode = isTouchDevice();
   /** Lives lost to each enemy type this game (for balance testing). */
   leaks: Partial<Record<EnemyKey, number>> = {};
 
@@ -127,6 +130,7 @@ export class GameScene extends Phaser.Scene {
     this.shortcutOpen = false;
     this.spellCooldown = { meteor: 0, freeze: 0 };
     this.aimingMeteor = false;
+    this.touchMode = isTouchDevice();
     this.leaks = {};
     this.pendingMeteors = [];
     this.seen = new Set();
@@ -193,7 +197,14 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.selected = null;
+    // A finger has no hover, so the preview waits for the first tap instead of sitting on the last one.
+    if (this.touchMode) this.placement.setHover(null);
     this.placement.begin(type);
+  }
+
+  /** True while the player is placing a tower or aiming the meteor, which the HUD CANCEL button stops. */
+  get isChoosing(): boolean {
+    return this.placement.type !== null || this.aimingMeteor;
   }
 
   cancelAll(): void {
@@ -258,6 +269,7 @@ export class GameScene extends Phaser.Scene {
       if (this.aimingMeteor) {
         this.placement.cancel();
         this.selected = null;
+        if (this.touchMode) this.aimPos = null;
       }
       return;
     }
@@ -633,11 +645,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onPointerMove(p: Phaser.Input.Pointer): void {
+    // A finger only moves the preview while it is dragging on the map; it never leaves it on the HUD.
+    if (p.wasTouch && (!p.isDown || !this.cellAt(p))) return;
     this.placement.setHover(this.cellAt(p));
     this.aimPos = p.x < MAP_W ? { x: p.x, y: p.y } : null;
   }
 
   private onPointerDown(p: Phaser.Input.Pointer): void {
+    this.touchMode = p.wasTouch;
     if (this.isOver) return;
     const cell = this.cellAt(p);
     if (!cell) return; // clicks on the HUD panel are handled by the UI scene
@@ -646,16 +661,32 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (this.aimingMeteor) {
-      this.dropMeteor(p.x, p.y);
+      // Touch: the first tap aims, a second tap inside the circle drops it.
+      if (p.wasTouch && !this.isNearAim(p.x, p.y)) {
+        this.aimPos = { x: p.x, y: p.y };
+        return;
+      }
+      const at = p.wasTouch && this.aimPos ? this.aimPos : p;
+      this.dropMeteor(at.x, at.y);
       return;
     }
     if (this.placement.type) {
+      // Touch: the first tap on a tile shows the tower and its range, a second tap on the same tile builds.
+      const hover = this.placement.hover;
+      if (p.wasTouch && (!hover || hover.col !== cell.col || hover.row !== cell.row)) {
+        this.placement.setHover(cell);
+        return;
+      }
       const placed = this.tryPlace(this.placement.type, cell.col, cell.row);
-      const keepPlacing = (p.event as MouseEvent).shiftKey;
+      const keepPlacing = !p.wasTouch && (p.event as MouseEvent).shiftKey;
       if (placed && !keepPlacing) this.placement.cancel();
       return;
     }
     this.selected = this.towerAt.get(this.cellKey(cell.col, cell.row)) ?? null;
+  }
+
+  private isNearAim(x: number, y: number): boolean {
+    return this.aimPos !== null && Math.hypot(x - this.aimPos.x, y - this.aimPos.y) <= METEOR.radius;
   }
 
   /** Builds a tower if the tile is free and the player can pay. */

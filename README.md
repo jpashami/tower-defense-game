@@ -16,6 +16,54 @@ Then open http://localhost:5173 in your browser.
 
 To make a shareable build, run `npm run build`. The finished game lands in `dist/`, which you can host on any static web host (GitHub Pages, Netlify, itch.io).
 
+## Play on a phone, with no internet
+
+The game works with touch and needs no internet once it is on the phone. Everything it needs, including the pixel font, ships with it. It plays in landscape; hold the phone sideways.
+
+### Option 1: install from a web page (Android and iPhone)
+
+The web build is an installable app (a PWA). Its service worker saves the whole game on the phone the first time it opens.
+
+1. Put `dist/` on any static web host (GitHub Pages, Netlify, itch.io). It needs `https`.
+2. Open the page on the phone once while online and let it load.
+3. Add it to the home screen. Android Chrome: menu, then **Add to Home screen** (or **Install app**). iPhone Safari: Share, then **Add to Home Screen**.
+4. From then on, open it from the home-screen icon. It works in aeroplane mode.
+
+To try the offline build on a computer, run `npm run build` then `npm run preview`.
+
+### Option 2: an Android app (APK)
+
+The `android/` folder is an Android Studio project made with [Capacitor](https://capacitorjs.com). It wraps the same web build in a full-screen, landscape-only app, so nothing is downloaded at run time.
+
+One-time setup: install [Android Studio](https://developer.android.com/studio). It brings the Android SDK and the Java it needs.
+
+Each time you change the game:
+
+```bash
+npm run android:sync
+```
+
+This builds the game and copies it into `android/`. Then build the APK:
+
+```bash
+npm run android:open
+```
+
+1. Android Studio opens the project. The first time, let it finish syncing Gradle (bottom status bar); it may offer to download missing SDK parts, so accept.
+2. Choose **Build > Build App Bundle(s) / APK(s) > Build APK(s)**.
+3. When it finishes, click **locate** in the pop-up. The file is `android/app/build/outputs/apk/debug/app-debug.apk`.
+
+To put it on a phone:
+
+- **With a USB cable (easiest):** on the phone, open **Settings > About phone** and tap **Build number** seven times to unlock Developer options, then turn on **USB debugging** in **Settings > System > Developer options**. Plug the phone in, accept the prompt on the phone, pick it in the device list at the top of Android Studio and press the green **Run** button. The app installs and opens.
+- **Without a cable:** copy `app-debug.apk` to the phone (Google Drive, email, USB storage), open it in the phone's Files app, and allow installing from that app when asked.
+
+A debug APK is fine for your own family's phones. Publishing on Google Play needs a signed release build (**Build > Generate Signed App Bundle / APK**) and a Play developer account.
+
+The app icon and splash screen are the game's own archer tower, drawn by `npm run icons` (`scripts/make-icons.mjs`) from the sprites in `src/art/`. Run it again after changing that art, then `npm run android:sync`.
+
+**iPhone app:** a native iOS build (`npx cap add ios`) needs a Mac with Xcode, so it is not set up here. On iPhones, use Option 1.
+
 ## How to play
 
 Pick a difficulty on the title screen with the buttons or the left and right arrow keys. The game remembers your choice.
@@ -35,12 +83,13 @@ Random maps have a **shortcut**: a darker strip of dirt cutting across one bend 
 ### Playing
 
 - Pick a tower in the shop on the right, then click a grass tile to build it. Shift-click builds several.
+- On a touch screen, the first tap on a grass tile shows the tower and its range; tap the same tile again to build it, or tap another tile to move it. **CANCEL** stops placing a tower or aiming the meteor.
 - Click a built tower to see its range, upgrade it, or sell it for 70% of what you spent.
 - Press **Start Wave** when you are ready. After each wave a 12-second countdown starts the next one; starting early pays a small gold bonus.
 - Each enemy that reaches the castle costs lives. Lose them all and the game is over. Survive wave 15 to win.
 - When nothing is selected, the panel shows what the **next wave** will send, so you can prepare. New enemy types are introduced with a tip the first time they appear.
 - Each tower has a **target** button: **FIRST** (closest to the castle), **STRONG** (most health) or **CLOSE** (nearest the tower).
-- **Spells** recharge while a wave is running. **Meteor** crushes ground enemies where you click. **Freeze** stops every enemy for 3 seconds (bosses are only slowed).
+- **Spells** recharge while a wave is running. **Meteor** crushes ground enemies where you click (on a touch screen, tap to aim, then tap inside the circle to drop it). **Freeze** stops every enemy for 3 seconds (bosses are only slowed).
 
 | Key | Action |
 | --- | --- |
@@ -118,6 +167,13 @@ src/
   systems/             Random map generator, wave spawning, economy, map drawing, placement, effects
   scenes/              Boot, Menu, Game, UI (HUD), GameOver, Editor (the Creator)
   ui/Button.ts         Pixel-style button
+  ui/touch.ts          Detects phones and tablets for tap hints
+public/
+  fonts/               Press Start 2P font and its licence (SIL OFL 1.1)
+  icons/               Home-screen icons (made by npm run icons)
+scripts/make-icons.mjs Draws the app icons and Android splash from the game's sprites
+android/               Android Studio project (Capacitor), see "Play on a phone"
+capacitor.config.ts    Android app id, name and the web folder it wraps
 ```
 
 ## Changing the game

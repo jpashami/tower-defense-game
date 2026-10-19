@@ -17,6 +17,7 @@ import { Enemy } from '../entities/Enemy';
 import { randomSeed } from '../systems/MapGenerator';
 import { renderMap } from '../systems/MapRenderer';
 import { Button } from '../ui/Button';
+import { isTouchDevice } from '../ui/touch';
 
 /** Title screen: a preview of the next map with enemies wandering behind the menu. */
 export class MenuScene extends Phaser.Scene {
@@ -72,9 +73,9 @@ export class MenuScene extends Phaser.Scene {
       (key, i) =>
         new Button(this, {
           x: left + i * (bw + 8),
-          y: 166,
+          y: 164,
           w: bw,
-          h: 24,
+          h: 28,
           label: DIFFICULTIES[key].name.toUpperCase(),
           depth: 21,
           onClick: () => this.setDifficulty(key),
@@ -84,9 +85,9 @@ export class MenuScene extends Phaser.Scene {
 
     // Map choices.
     const mx = cx - 184;
-    this.mapBtn = new Button(this, { x: mx, y: 218, w: 128, h: 24, label: '', depth: 21, onClick: () => this.toggleMapMode() });
-    this.newMapBtn = new Button(this, { x: mx + 136, y: 218, w: 96, h: 24, label: 'NEW MAP', depth: 21, onClick: () => this.reroll() });
-    this.shortcutBtn = new Button(this, { x: mx + 240, y: 218, w: 128, h: 24, label: '', depth: 21, onClick: () => this.toggleShortcut() });
+    this.mapBtn = new Button(this, { x: mx, y: 216, w: 128, h: 28, label: '', depth: 21, onClick: () => this.toggleMapMode() });
+    this.newMapBtn = new Button(this, { x: mx + 136, y: 216, w: 96, h: 28, label: 'NEW MAP', depth: 21, onClick: () => this.reroll() });
+    this.shortcutBtn = new Button(this, { x: mx + 240, y: 216, w: 128, h: 28, label: '', depth: 21, onClick: () => this.toggleShortcut() });
     this.mapText = title(254, '', 8, '#94b0c2');
 
     const play = new Button(this, {
@@ -120,7 +121,9 @@ export class MenuScene extends Phaser.Scene {
     ).setLineSpacing(8);
     title(
       392,
-      'KEYS  1-5 build   U upgrade   S sell   T target\nQ meteor   W freeze   SPACE wave   F speed   P pause',
+      isTouchDevice()
+        ? 'Tap a tower in the shop, tap a grass square to see it,\nthen tap the same square again to build it.'
+        : 'KEYS  1-5 build   U upgrade   S sell   T target\nQ meteor   W freeze   SPACE wave   F speed   P pause',
       8,
       '#566c86',
     ).setLineSpacing(8);

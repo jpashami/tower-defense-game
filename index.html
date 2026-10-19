@@ -2,19 +2,45 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Pixel Tower Defence</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+    <meta name="theme-color" content="#1a1c2c" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Tower Defence" />
+    <link rel="icon" type="image/png" href="./icons/favicon-32.png" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <!-- The pixel font ships with the game (public/fonts, SIL OFL) so it works offline. -->
+    <link rel="preload" href="/fonts/PressStart2P-Regular.ttf" as="font" type="font/ttf" crossorigin />
     <style>
+      @font-face {
+        font-family: 'Press Start 2P';
+        src: url('/fonts/PressStart2P-Regular.ttf') format('truetype');
+        font-display: block;
+      }
       html, body { margin: 0; padding: 0; height: 100%; background: #1a1c2c; overflow: hidden; }
-      #game { width: 100vw; height: 100vh; }
+      body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+      /* iOS will not let you type in a box that inherits user-select: none. */
+      input, textarea { -webkit-user-select: text; user-select: text; }
+      #game { width: 100%; height: 100%; }
       canvas { image-rendering: pixelated; }
+      #rotate { display: none; }
+      /* Phones held upright: the game is landscape only. */
+      @media (orientation: portrait) and (pointer: coarse) {
+        #rotate {
+          display: flex; position: fixed; inset: 0; z-index: 10;
+          flex-direction: column; align-items: center; justify-content: center; gap: 24px;
+          background: #1a1c2c; color: #ffcd75; text-align: center;
+          font: 12px/2 'Press Start 2P', monospace;
+        }
+        #rotate span { font-size: 40px; color: #73eff7; }
+      }
     </style>
   </head>
   <body>
     <div id="game"></div>
+    <div id="rotate"><span>&#8635;</span>TURN YOUR<br />PHONE SIDEWAYS</div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

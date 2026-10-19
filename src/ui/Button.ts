@@ -67,6 +67,12 @@ export class Button {
     this.zone.on('pointerdown', () => {
       if (this.enabled && this.visible) opts.onClick();
     });
+    // A finger lifting off never sends pointerout, so drop the hover glow it left behind.
+    this.zone.on('pointerup', (p: Phaser.Input.Pointer) => {
+      if (!p.wasTouch) return;
+      this.hovered = false;
+      this.redraw();
+    });
     if (opts.depth !== undefined) {
       this.gfx.setDepth(opts.depth);
       this.label?.setDepth(opts.depth);
