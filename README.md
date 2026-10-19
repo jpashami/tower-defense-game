@@ -24,8 +24,8 @@ The game works with touch and needs no internet once it is on the phone. Everyth
 
 The web build is an installable app (a PWA). Its service worker saves the whole game on the phone the first time it opens.
 
-1. Put `dist/` on any static web host (GitHub Pages, Netlify, itch.io). It needs `https`.
-2. Open the page on the phone once while online and let it load.
+1. Open **https://jpashami.github.io/tower-defense-game/** on the phone while online and let it load. Every push to `main` rebuilds and republishes this page automatically (`.github/workflows/deploy-pages.yml`), and installed copies update themselves the next time they open online.
+2. Wait a few seconds on the title screen so the whole game is saved for offline use.
 3. Add it to the home screen. Android Chrome: menu, then **Add to Home screen** (or **Install app**). iPhone Safari: Share, then **Add to Home Screen**.
 4. From then on, open it from the home-screen icon. It works in aeroplane mode.
 
