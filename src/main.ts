@@ -47,20 +47,41 @@ async function start(): Promise<void> {
 
 void start();
 
-/** When the phone turns or the window resizes, widen or narrow the canvas to match. */
+/**
+ * When the phone turns or the window resizes, widen or narrow the canvas to match.
+ * A ResizeObserver on the game's container catches every change, including rotation,
+ * which the window "resize" event does not always report. Phaser is told to re-fit
+ * every time, because its own fit can be left at the old orientation's size.
+ */
 function followScreenShape(game: Phaser.Game, holder: HTMLElement): void {
   let timer = 0;
-  const check = () => {
-    window.clearTimeout(timer);
-    timer = window.setTimeout(() => {
-      const w = widthFor(holder.clientWidth, holder.clientHeight);
-      if (w === view.width) return;
+  let fittedTo = '';
+  const refit = () => {
+    const size = `${holder.clientWidth}x${holder.clientHeight}`;
+    if (holder.clientWidth === 0 || holder.clientHeight === 0) return;
+    fittedTo = size;
+    const w = widthFor(holder.clientWidth, holder.clientHeight);
+    if (w !== view.width) {
       view.width = w;
       game.scale.setGameSize(w, GAME_H);
-    }, 150);
+    }
+    game.scale.refresh();
   };
-  window.addEventListener('resize', check);
-  window.addEventListener('orientationchange', check);
+  // Wait for a rotation to settle before measuring.
+  const soon = () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(refit, 150);
+  };
+  if ('ResizeObserver' in window) new ResizeObserver(soon).observe(holder);
+  window.addEventListener('resize', soon);
+  window.addEventListener('orientationchange', soon);
+  screen.orientation?.addEventListener?.('change', soon);
+  // Safety net: some browsers report a rotation late or only half way, so check once a
+  // second and re-fit if the screen is no longer the size the game was fitted to.
+  window.setInterval(() => {
+    if (`${holder.clientWidth}x${holder.clientHeight}` !== fittedTo) refit();
+  }, 1000);
+  refit();
 }
 
 /**
