@@ -20,6 +20,8 @@ To make a shareable build, run `npm run build`. The finished game lands in `dist
 
 The game works with touch and needs no internet once it is on the phone. Everything it needs, including the pixel font, ships with it. It plays in landscape; hold the phone sideways.
 
+On a phone the game fills the whole screen: the map uses the full height and the side panel spreads into the extra width as two larger columns. **Pinch the map with two fingers to zoom in** (up to 2.5x) and drag with one finger to look around; tapping to build works the same while zoomed. On a computer, the mouse wheel zooms. In a phone browser the first tap switches to full screen to hide the address bar (Android and Fire tablets; on iPhones, add the game to the home screen for full screen).
+
 ### Option 1: install from a web page (Android and iPhone)
 
 The web build is an installable app (a PWA). Its service worker saves the whole game on the phone the first time it opens.

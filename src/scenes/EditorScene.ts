@@ -24,6 +24,7 @@ import { decodeLevel, encodeLevel } from '../editor/shareCode';
 import { renderMap } from '../systems/MapRenderer';
 import { Button, type ButtonOptions } from '../ui/Button';
 import { isTouchDevice } from '../ui/touch';
+import { centreScene, fullScreenRect } from '../ui/layout';
 
 type Tool = 'path' | 'tree' | 'rock' | 'erase';
 interface Cell {
@@ -84,6 +85,7 @@ export class EditorScene extends Phaser.Scene {
   }
 
   create(data?: { level?: CustomLevel }): void {
+    centreScene(this);
     this.level = cloneLevel(data?.level ?? loadDraft() ?? blankLevel());
     this.tool = 'path';
     this.mapObjects = [];
@@ -302,8 +304,10 @@ export class EditorScene extends Phaser.Scene {
   }
 
   private cellAt(p: Phaser.Input.Pointer): Cell | null {
-    if (p.x < 0 || p.x >= MAP_W || p.y < 0 || p.y >= MAP_H) return null;
-    return { col: Math.floor(p.x / TILE), row: Math.floor(p.y / TILE) };
+    // World coordinates: on wide screens the camera is shifted to centre the Creator.
+    const { worldX: x, worldY: y } = p;
+    if (x < 0 || x >= MAP_W || y < 0 || y >= MAP_H) return null;
+    return { col: Math.floor(x / TILE), row: Math.floor(y / TILE) };
   }
 
   private pathIndex(col: number, row: number): number {
@@ -461,7 +465,7 @@ export class EditorScene extends Phaser.Scene {
     this.overlay = [];
     if (!this.overlayBuild) return;
     this.overlay.push(
-      this.add.rectangle(0, 0, GAME_W, GAME_H, 0x1a1c2c, 0.97).setOrigin(0).setDepth(OVERLAY_DEPTH).setInteractive(),
+      fullScreenRect(this, 0x1a1c2c, 0.97).setDepth(OVERLAY_DEPTH).setInteractive(),
     );
     this.overlayBuild();
   }

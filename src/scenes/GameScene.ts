@@ -34,6 +34,7 @@ import {
 } from '../systems/Effects';
 import { renderMap } from '../systems/MapRenderer';
 import { randomSeed, type ShortcutDef } from '../systems/MapGenerator';
+import { MapCamera } from '../systems/MapCamera';
 import { PlacementController } from '../systems/PlacementController';
 import { WaveManager } from '../systems/WaveManager';
 import { isTouchDevice } from '../ui/touch';
@@ -97,6 +98,7 @@ export class GameScene extends Phaser.Scene {
   private pendingMeteors: { x: number; y: number; t: number; damage: number }[] = [];
   private seen = new Set<EnemyKey>();
   private aimPos: Point | null = null;
+  private mapCam!: MapCamera;
   private bars!: Phaser.GameObjects.Graphics;
   private rangeGfx!: Phaser.GameObjects.Graphics;
   private callout: Phaser.GameObjects.GameObject[] = [];
@@ -156,8 +158,10 @@ export class GameScene extends Phaser.Scene {
     this.placement = new PlacementController(this);
 
     this.input.mouse?.disableContextMenu();
+    this.mapCam = new MapCamera(this);
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => this.onPointerMove(p));
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.onPointerDown(p));
+    this.input.on('pointerup', (p: Phaser.Input.Pointer) => this.onPointerUp(p));
 
     const kb = this.input.keyboard;
     if (kb) {
@@ -631,9 +635,19 @@ export class GameScene extends Phaser.Scene {
     return `${col},${row}`;
   }
 
-  private cellAt(p: Phaser.Input.Pointer): { col: number; row: number } | null {
+  /** The map point under a pointer, allowing for zoom; null when the pointer is over the HUD. */
+  private toWorld(p: Phaser.Input.Pointer): Point | null {
     if (p.x < 0 || p.x >= MAP_W || p.y < 0 || p.y >= MAP_H) return null;
-    return { col: Math.floor(p.x / TILE), row: Math.floor(p.y / TILE) };
+    const w = this.cameras.main.getWorldPoint(p.x, p.y);
+    return { x: w.x, y: w.y };
+  }
+
+  private cellAt(p: Phaser.Input.Pointer): { col: number; row: number } | null {
+    const w = this.toWorld(p);
+    if (!w) return null;
+    const col = Math.floor(w.x / TILE);
+    const row = Math.floor(w.y / TILE);
+    return col >= 0 && col < COLS && row >= 0 && row < ROWS ? { col, row } : null;
   }
 
   isBuildable(col: number, row: number): boolean {
@@ -645,15 +659,31 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onPointerMove(p: Phaser.Input.Pointer): void {
+    // Zoomed in, a finger drags the map around (and pinching zooms).
+    if (p.wasTouch && this.mapCam.move(p)) return;
     // A finger only moves the preview while it is dragging on the map; it never leaves it on the HUD.
     if (p.wasTouch && (!p.isDown || !this.cellAt(p))) return;
     this.placement.setHover(this.cellAt(p));
-    this.aimPos = p.x < MAP_W ? { x: p.x, y: p.y } : null;
+    this.aimPos = this.toWorld(p);
   }
 
   private onPointerDown(p: Phaser.Input.Pointer): void {
     this.touchMode = p.wasTouch;
+    if (p.x >= MAP_W) return; // the HUD is handled by the UI scene
+    // Fingers act when lifted, so a drag or pinch never builds by accident. The mouse acts at once.
+    if (p.wasTouch) this.mapCam.down(p);
+    else this.handleTap(p);
+  }
+
+  private onPointerUp(p: Phaser.Input.Pointer): void {
+    if (!p.wasTouch) return;
+    const tap = this.mapCam.up(p);
+    if (tap && p.x < MAP_W) this.handleTap(p);
+  }
+
+  private handleTap(p: Phaser.Input.Pointer): void {
     if (this.isOver) return;
+    const world = this.toWorld(p);
     const cell = this.cellAt(p);
     if (!cell) return; // clicks on the HUD panel are handled by the UI scene
     if (p.rightButtonDown()) {
@@ -662,11 +692,12 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.aimingMeteor) {
       // Touch: the first tap aims, a second tap inside the circle drops it.
-      if (p.wasTouch && !this.isNearAim(p.x, p.y)) {
-        this.aimPos = { x: p.x, y: p.y };
+      if (!world) return;
+      if (p.wasTouch && !this.isNearAim(world.x, world.y)) {
+        this.aimPos = world;
         return;
       }
-      const at = p.wasTouch && this.aimPos ? this.aimPos : p;
+      const at = p.wasTouch && this.aimPos ? this.aimPos : world;
       this.dropMeteor(at.x, at.y);
       return;
     }

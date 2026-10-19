@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
-import { FONT, GAME_H, GAME_W } from '../config/constants';
+import { FONT, GAME_W } from '../config/constants';
 import { DIFFICULTIES, type DifficultyKey } from '../config/difficulty';
 import type { MapMode } from '../config/settings';
 import type { CustomLevel } from '../editor/customLevel';
 import { randomSeed } from '../systems/MapGenerator';
 import { Button } from '../ui/Button';
+import { centreScene, fullScreenRect } from '../ui/layout';
 
 interface GameOverData {
   won: boolean;
@@ -24,9 +25,10 @@ export class GameOverScene extends Phaser.Scene {
   }
 
   create(data: GameOverData): void {
+    centreScene(this);
     const cx = GAME_W / 2;
     // Full-screen blocker so clicks don't reach the game underneath.
-    this.add.rectangle(0, 0, GAME_W, GAME_H, 0x1a1c2c, 0.75).setOrigin(0).setInteractive();
+    fullScreenRect(this, 0x1a1c2c, 0.75).setInteractive();
 
     const style = (size: number, color: string) => ({
       fontFamily: FONT,

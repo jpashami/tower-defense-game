@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { DEPTH, FONT, GAME_H, GAME_W, MAP_H, MAP_W } from '../config/constants';
+import { DEPTH, FONT, GAME_W, MAP_H, MAP_W } from '../config/constants';
 import {
   DIFFICULTIES,
   DIFFICULTY_ORDER,
@@ -17,6 +17,7 @@ import { Enemy } from '../entities/Enemy';
 import { randomSeed } from '../systems/MapGenerator';
 import { renderMap } from '../systems/MapRenderer';
 import { Button } from '../ui/Button';
+import { centreScene, fullScreenRect } from '../ui/layout';
 import { isTouchDevice } from '../ui/touch';
 
 /** Title screen: a preview of the next map with enemies wandering behind the menu. */
@@ -42,6 +43,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   create(): void {
+    centreScene(this);
     this.walkers = [];
     this.mapObjects = [];
     this.spawnTimer = 0;
@@ -52,7 +54,7 @@ export class MenuScene extends Phaser.Scene {
     this.seed = randomSeed();
 
     this.add.rectangle(MAP_W, 0, GAME_W - MAP_W, MAP_H, 0x1a1c2c).setOrigin(0).setDepth(19);
-    this.add.rectangle(0, 0, GAME_W, GAME_H, 0x1a1c2c, 0.55).setOrigin(0).setDepth(20);
+    fullScreenRect(this, 0x1a1c2c, 0.55).setDepth(20);
 
     const cx = GAME_W / 2;
     const title = (y: number, text: string, size: number, color: string) =>
@@ -122,8 +124,8 @@ export class MenuScene extends Phaser.Scene {
     title(
       392,
       isTouchDevice()
-        ? 'Tap a tower in the shop, tap a grass square to see it,\nthen tap the same square again to build it.'
-        : 'KEYS  1-5 build   U upgrade   S sell   T target\nQ meteor   W freeze   SPACE wave   F speed   P pause',
+        ? 'Tap a tower in the shop, tap a grass square to see it,\nthen tap it again to build. Pinch the map to zoom in.'
+        : 'KEYS  1-5 build   U upgrade   S sell   T target   WHEEL zoom\nQ meteor   W freeze   SPACE wave   F speed   P pause',
       8,
       '#566c86',
     ).setLineSpacing(8);

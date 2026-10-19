@@ -5,6 +5,7 @@ import { SPELLS, SPELL_ORDER, type SpellKey } from '../config/spells';
 import { TOWER_ORDER, type TargetMode, type TowerDef, type TowerKey } from '../config/towers';
 import { Button } from '../ui/Button';
 import { isTouchDevice } from '../ui/touch';
+import { view } from '../ui/layout';
 import type { GameScene } from './GameScene';
 
 const X = MAP_W + 8;
@@ -23,6 +24,12 @@ const ACTION_Y = INFO_Y + INFO_H + 4;
 const SPELL_Y = ACTION_Y + 2 * ROW_STEP;
 const START_Y = SPELL_Y + ROW_STEP;
 const SPEED_Y = START_Y + ROW_STEP;
+
+// The two halves of the panel, used to show it as two enlarged columns on wide screens.
+const TOP_PART = { y: 0, h: SHOP_Y + 4 * SHOP_STEP + SHOP_H + 4 };
+const BOTTOM_PART = { y: INFO_Y - 4, h: GAME_H - (INFO_Y - 4) };
+/** Below this enlargement the normal single panel is used. */
+const MIN_ZOOM = 1.1;
 
 const TARGET_LABEL: Record<TargetMode, string> = { first: 'FIRST', strongest: 'STRONG', closest: 'CLOSE' };
 
@@ -60,6 +67,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.layoutForScreen();
     this.gs = this.scene.get('Game') as GameScene;
     this.shop = [];
     this.previewIcons = [];
@@ -124,6 +132,32 @@ export class UIScene extends Phaser.Scene {
     this.speedBtn = new Button(this, { x: X, y: SPEED_Y, w: half, h: BTN_H, label: '', onClick: () => this.gs.toggleSpeed() });
     this.pauseBtn = new Button(this, { x: X + half + 4, y: SPEED_Y, w: half, h: BTN_H, label: '', onClick: () => this.gs.togglePause() });
     if (!isTouchDevice()) this.text(X + W / 2, SPEED_Y + BTN_H + 3, 'Q METEOR  W FREEZE', '#566c86').setOrigin(0.5, 0);
+  }
+
+  /**
+   * On wide screens (phones held sideways) the panel's two halves are shown side
+   * by side through two zoomed cameras, making text and buttons bigger. The layout
+   * itself is unchanged, so taps still land on the right buttons.
+   */
+  private layoutForScreen(): void {
+    const onResize = () => this.scene.restart();
+    this.scale.on(Phaser.Scale.Events.RESIZE, onResize);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.scale.off(Phaser.Scale.Events.RESIZE, onResize));
+
+    const space = view.width - MAP_W;
+    const zoom = Math.min((space - 12) / (2 * PANEL_W), GAME_H / BOTTOM_PART.h);
+    if (zoom < MIN_ZOOM) return;
+    const colW = PANEL_W * zoom;
+    const gap = (space - 2 * colW) / 3;
+    const centreX = MAP_W + PANEL_W / 2;
+    this.cameras.main
+      .setViewport(MAP_W + gap, 0, colW, TOP_PART.h * zoom)
+      .setZoom(zoom)
+      .centerOn(centreX, TOP_PART.y + TOP_PART.h / 2);
+    this.cameras
+      .add(MAP_W + 2 * gap + colW, 0, colW, BOTTOM_PART.h * zoom)
+      .setZoom(zoom)
+      .centerOn(centreX, BOTTOM_PART.y + BOTTOM_PART.h / 2);
   }
 
   update(): void {
