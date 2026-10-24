@@ -8,8 +8,7 @@ import type { TowerKey } from '../config/towers';
 import type { GameScene } from '../scenes/GameScene';
 import { fx } from '../systems/Effects';
 import { EXAMPLE_VERSIONS } from '../version/examples';
-import { setActiveVersion } from '../version/registry';
-import { loadActiveVersion } from '../version/store';
+import { setActiveVersion, useSavedVersion } from '../version/registry';
 import { checkVersion } from '../version/validate';
 
 /**
@@ -243,7 +242,7 @@ export function install(game: Phaser.Game): void {
   const w = window as unknown as Record<string, unknown>;
   // Leave the title screen showing afterwards rather than a half-finished test game.
   const backToMenu = <T>(result: T): T => {
-    setActiveVersion(loadActiveVersion()?.data ?? null);
+    useSavedVersion();
     game.scene.stop('UI');
     game.scene.stop('Game');
     game.scene.start('Menu');

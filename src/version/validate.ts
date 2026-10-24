@@ -1,4 +1,5 @@
 import { PALETTE } from '../art/palette';
+import { compileVersion } from './compile';
 import { parseDrawnMap } from './drawnMap';
 import {
   BUILTIN_ENEMY_KEYS,
@@ -258,7 +259,8 @@ export function checkVersion(raw: unknown): CheckResult {
   for (const [i, t] of rawTraps.slice(0, Math.max(0, trapRoom)).entries()) {
     const vt = checkTrap(ck, t, i);
     if (!vt) continue;
-    if (traps.some((x) => x.id === vt.id) || towers.some((x) => x.id === vt.id)) {
+    const shopTowers: readonly string[] = towers.length ? towers.map((x) => x.id) : BUILTIN_TOWER_KEYS;
+    if (traps.some((x) => x.id === vt.id) || shopTowers.includes(vt.id)) {
       ck.say(`trap ${vt.id}`, 'something else already has this id, so it was left out.');
       continue;
     }
@@ -283,6 +285,12 @@ export function checkVersion(raw: unknown): CheckResult {
     out.map = { size: 'small', river: true };
   }
 
+  // Last line of defence: a version the game can't build is refused here, before it can be saved or played.
+  try {
+    compileVersion(out);
+  } catch {
+    return { ok: false, error: 'This version has a mistake the game can\'t use. Ask Claude to check it and send it again.', problems: ck.problems };
+  }
   return { ok: true, version: out, problems: ck.problems };
 }
 

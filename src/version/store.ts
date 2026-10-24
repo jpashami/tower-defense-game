@@ -32,11 +32,21 @@ export function listVersions(): SavedVersion[] {
 
 export type SaveVersionResult = { ok: true; id: string } | { ok: false; reason: 'full' | 'storage' };
 
-/** Saves a version (replacing one with the same name), or says why it couldn't. */
-export function saveVersion(data: VersionData): SaveVersionResult {
+/** Another saved version with the same name but different contents, if there is one. */
+export function sameNameVersion(data: VersionData): SavedVersion | null {
+  const id = versionHash(data);
+  return listVersions().find((v) => v.id !== id && v.data.name === data.name) ?? null;
+}
+
+/**
+ * Saves a version, or says why it couldn't. An identical one is just kept; `replace`
+ * names a different saved version (usually an older one with the same name) to overwrite.
+ */
+export function saveVersion(data: VersionData, replace?: string): SaveVersionResult {
   const list = listVersions();
   const id = versionHash(data);
-  const same = list.findIndex((v) => v.id === id || v.data.name === data.name);
+  let same = list.findIndex((v) => v.id === id);
+  if (same < 0 && replace) same = list.findIndex((v) => v.id === replace);
   if (same >= 0) list[same] = { id, data };
   else if (list.length >= MAX_VERSIONS) return { ok: false, reason: 'full' };
   else list.push({ id, data });
