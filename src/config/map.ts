@@ -1,7 +1,34 @@
 import { COLS, ROWS, TILE } from './constants';
 
-export type TileType = 'grass' | 'path' | 'shortcut' | 'blocked';
-export type DecorationKind = 'tree' | 'rock';
+export type TileType = 'grass' | 'path' | 'shortcut' | 'blocked' | 'water' | 'bridge' | 'sand' | 'ice' | 'lava';
+/** Trees and rocks block building; flowers are only for looks. */
+export type DecorationKind = 'tree' | 'rock' | 'flowers';
+/**
+ * Ground that changes a tile: extra road (off the enemies' routes), water (a bridge
+ * where the road crosses it), or a road surface.
+ */
+export type SurfaceKind = 'road' | 'water' | 'sand' | 'ice' | 'lava';
+export interface TerrainTile {
+  col: number;
+  row: number;
+  kind: SurfaceKind;
+}
+
+/** Tiles walking enemies move along. */
+export const isRoad = (t: TileType | undefined): boolean =>
+  t === 'path' || t === 'shortcut' || t === 'bridge' || t === 'sand' || t === 'ice' || t === 'lava';
+/** Road tiles that can hold a trap (not bridges). */
+export const isTrapTile = (t: TileType | undefined): boolean => isRoad(t) && t !== 'bridge';
+
+/** What road surfaces do to walkers. */
+export const SURFACE = {
+  /** Speed multiplier on sand. */
+  sand: 0.6,
+  /** Speed multiplier on ice. */
+  ice: 1.5,
+  /** Lava damage per second, before the wave's health multiplier. */
+  lavaDps: 10,
+};
 export interface Decoration {
   col: number;
   row: number;
@@ -64,28 +91,52 @@ export function pathPoints(path: [number, number][] = PATH_TILES): Point[] {
   return path.map(([c, r]) => tileCenter(c, r));
 }
 
-/** Builds the tile grid: path from the corners, blocked from decorations, the rest grass. */
+export interface GridOptions {
+  cols?: number;
+  rows?: number;
+  /** Routes from any other portals. */
+  extraPaths?: [number, number][][];
+  terrain?: TerrainTile[];
+}
+
+/**
+ * Builds the tile grid: road from the corners, then water and road surfaces,
+ * then trees and rocks on grass. Everything else is grass.
+ */
 export function buildGrid(
   path: [number, number][] = PATH_TILES,
   decorations: Decoration[] = DECORATIONS,
+  opts: GridOptions = {},
 ): TileType[][] {
-  const grid: TileType[][] = Array.from({ length: ROWS }, () =>
-    Array.from({ length: COLS }, (): TileType => 'grass'),
+  const cols = opts.cols ?? COLS;
+  const rows = opts.rows ?? ROWS;
+  const grid: TileType[][] = Array.from({ length: rows }, () =>
+    Array.from({ length: cols }, (): TileType => 'grass'),
   );
   const mark = (c: number, r: number, t: TileType) => {
-    if (c >= 0 && c < COLS && r >= 0 && r < ROWS) grid[r][c] = t;
+    if (c >= 0 && c < cols && r >= 0 && r < rows) grid[r][c] = t;
   };
 
-  for (let i = 0; i < path.length - 1; i++) {
-    const [c0, r0] = path[i];
-    const [c1, r1] = path[i + 1];
-    const steps = Math.max(Math.abs(c1 - c0), Math.abs(r1 - r0));
-    for (let s = 0; s <= steps; s++) {
-      mark(c0 + Math.sign(c1 - c0) * s, r0 + Math.sign(r1 - r0) * s, 'path');
+  for (const route of [path, ...(opts.extraPaths ?? [])]) {
+    for (let i = 0; i < route.length - 1; i++) {
+      const [c0, r0] = route[i];
+      const [c1, r1] = route[i + 1];
+      const steps = Math.max(Math.abs(c1 - c0), Math.abs(r1 - r0));
+      for (let s = 0; s <= steps; s++) {
+        mark(c0 + Math.sign(c1 - c0) * s, r0 + Math.sign(r1 - r0) * s, 'path');
+      }
     }
   }
+  for (const t of opts.terrain ?? []) {
+    const cur = grid[t.row]?.[t.col];
+    if (cur === undefined) continue;
+    if (t.kind === 'road') {
+      if (cur === 'grass') grid[t.row][t.col] = 'path';
+    } else if (t.kind === 'water') grid[t.row][t.col] = cur === 'path' ? 'bridge' : 'water';
+    else if (cur === 'path') grid[t.row][t.col] = t.kind;
+  }
   for (const d of decorations) {
-    if (grid[d.row]?.[d.col] === 'grass') grid[d.row][d.col] = 'blocked';
+    if (d.kind !== 'flowers' && grid[d.row]?.[d.col] === 'grass') grid[d.row][d.col] = 'blocked';
   }
   return grid;
 }

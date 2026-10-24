@@ -126,3 +126,18 @@ export function meteorImpact(scene: Phaser.Scene, x: number, y: number, radius: 
   burst(scene, x, y, 0x566c86, 10, radius * 0.6);
   scene.cameras.main.shake(180, 0.008);
 }
+
+/** A quick line from an attacker to what it hits (enemies striking towers). */
+export function strike(scene: Phaser.Scene, from: { x: number; y: number }, to: { x: number; y: number }, color = 0xb13e53): void {
+  if (!fx.enabled) return;
+  const g = scene.add.graphics().setDepth(DEPTH.effect);
+  g.lineStyle(2, color, 1).lineBetween(from.x, from.y, to.x, to.y);
+  scene.tweens.add({ targets: g, alpha: 0, duration: 200, onComplete: () => g.destroy() });
+}
+
+/** A puff where an enemy vanishes and reappears (teleport). */
+export function puff(scene: Phaser.Scene, x: number, y: number, color = 0xc27bc2): void {
+  if (!fx.enabled) return;
+  ring(scene, x, y, 14, color);
+  burst(scene, x, y, color, 8, 14);
+}

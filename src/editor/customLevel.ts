@@ -19,6 +19,8 @@ export interface CustomLevel {
   /** Painted path tiles in walking order. The first is on the left edge, the last is the castle. */
   path: [number, number][];
   decorations: Decoration[];
+  /** Water squares; where the path crosses water it becomes a bridge. */
+  water?: [number, number][];
   waves: WaveCounts[];
   towers: Record<CreatorTowerKey, TowerTuning>;
   startMoney: number;
@@ -165,6 +167,7 @@ export function toLevelDef(l: CustomLevel): LevelDef {
     name: l.name || 'MY LEVEL',
     path: pathCorners(l.path),
     decorations: l.decorations,
+    terrain: (l.water ?? []).map(([col, row]) => ({ col, row, kind: 'water' as const })),
     waves: l.waves.filter((w) => waveTotal(w) > 0).map(waveDef),
     towers: l.towers,
     startMoney: l.startMoney,
@@ -207,6 +210,18 @@ export function normaliseLevel(raw: unknown): CustomLevel | null {
     decorations.push({ col, row, kind: dd.kind });
   }
 
+  const water: [number, number][] = [];
+  const wet = new Set<string>();
+  for (const w of Array.isArray(o.water) ? o.water.slice(0, COLS * ROWS) : []) {
+    if (!Array.isArray(w)) continue;
+    const col = int(w[0], -1, COLS, -1);
+    const row = int(w[1], -1, ROWS, -1);
+    const key = `${col},${row}`;
+    if (col < 0 || col >= COLS || row < 0 || row >= ROWS || wet.has(key)) continue;
+    wet.add(key);
+    water.push([col, row]);
+  }
+
   const waves = o.waves.slice(0, LIMITS.waves.max).map((w) => {
     const ww = (w ?? {}) as Partial<WaveCounts>;
     const n = counts(0);
@@ -232,7 +247,8 @@ export function normaliseLevel(raw: unknown): CustomLevel | null {
     id: typeof o.id === 'string' ? o.id : undefined,
     name: cleanName(typeof o.name === 'string' ? o.name : '') || 'MY LEVEL',
     path,
-    decorations,
+    decorations: decorations.filter((d) => !wet.has(`${d.col},${d.row}`)),
+    ...(water.length ? { water } : {}),
     waves,
     towers,
     startMoney: int(o.startMoney, LIMITS.money.min, LIMITS.money.max, 150),

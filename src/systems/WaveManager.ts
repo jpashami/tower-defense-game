@@ -1,9 +1,8 @@
-import type { EnemyKey } from '../config/enemies';
 import type { WaveDef } from '../config/waves';
 
 interface QueuedSpawn {
   time: number;
-  enemy: EnemyKey;
+  enemy: string;
 }
 
 /** Turns wave definitions into timed spawns. */
@@ -48,7 +47,7 @@ export class WaveManager {
       .sort((a, b) => a.time - b.time);
   }
 
-  update(dt: number, spawn: (enemy: EnemyKey) => void): void {
+  update(dt: number, spawn: (enemy: string) => void): void {
     if (!this.spawning) return;
     this.elapsed += dt;
     while (this.queue.length > 0 && this.queue[0].time <= this.elapsed) {

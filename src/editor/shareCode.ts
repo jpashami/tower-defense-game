@@ -8,8 +8,11 @@ import { ENEMY_ORDER, normaliseLevel, type CustomLevel, type WaveCounts } from '
  * Fields, separated by dots: version, name, gold, lives, path, decorations,
  * waves, towers, checksum. Numbers are base 36. The path is its start row
  * followed by direction + length pairs. Codes ignore upper/lower case.
+ * Levels with water use TD2, which adds a water field (column + row per square)
+ * before the checksum; levels without water still make TD1 codes, and both load.
  */
 const VERSION = 'TD1';
+const VERSION_WATER = 'TD2';
 const DIRS: Record<string, [number, number]> = { R: [1, 0], L: [-1, 0], U: [0, -1], D: [0, 1] };
 
 const b36 = (n: number, width = 1): string => n.toString(36).toUpperCase().padStart(width, '0');
@@ -52,8 +55,9 @@ export function encodeLevel(l: CustomLevel): string {
         return b36(t.damage, 2) + b36(Math.round(t.range / 8)) + b36(Math.round(t.cost / 5), 2);
       }).join('')
     : '';
+  const water = (l.water ?? []).map(([c, r]) => b36(c) + b36(r)).join('');
   const body = [
-    VERSION,
+    water ? VERSION_WATER : VERSION,
     l.name.replace(/ /g, '_'),
     b36(l.startMoney),
     b36(l.startLives),
@@ -61,6 +65,7 @@ export function encodeLevel(l: CustomLevel): string {
     decor,
     waves,
     towers,
+    ...(water ? [water] : []),
   ].join('.');
   return `${body}.${checksum(body)}`;
 }
@@ -80,10 +85,13 @@ export function decodeLevel(code: string): CustomLevel | string {
   const bad = "That code doesn't look right.\nCheck you copied all of it.";
   const clean = code.replace(/\s+/g, '').toUpperCase();
   const parts = clean.split('.');
-  if (parts.length !== 9 || parts[0] !== VERSION) return bad;
-  const body = parts.slice(0, 8).join('.');
-  if (checksum(body) !== parts[8]) return bad;
+  const fields = parts[0] === VERSION ? 9 : parts[0] === VERSION_WATER ? 10 : 0;
+  if (fields === 0 || parts.length !== fields) return bad;
+  const body = parts.slice(0, fields - 1).join('.');
+  if (checksum(body) !== parts[fields - 1]) return bad;
   const [, name, money, lives, pathStr, decorStr, waveStr, towerStr] = parts;
+  const water = fields === 10 ? chunks(parts[8], 2) : [];
+  if (!water) return bad;
 
   const path: [number, number][] = [];
   if (pathStr.length > 0) {
@@ -114,6 +122,7 @@ export function decodeLevel(code: string): CustomLevel | string {
     startMoney: num(money),
     startLives: num(lives),
     path,
+    water: water.map((w) => [num(w[0]), num(w[1])]),
     decorations: decor.map((d) => ({ col: num(d[0]), row: num(d[1]), kind: d[2] === 'T' ? 'tree' : 'rock' })),
     waves: waves.map((w) => Object.fromEntries(ENEMY_ORDER.map((e, i) => [e, num(w[i])])) as WaveCounts),
     towers: Object.fromEntries(

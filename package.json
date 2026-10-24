@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "icons": "node scripts/make-icons.mjs",
     "android:sync": "npm run build && cap sync android",
-    "android:open": "cap open android"
+    "android:open": "cap open android",
+    "test": "node --import ./scripts/ts-hooks.mjs --test tests/*.test.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

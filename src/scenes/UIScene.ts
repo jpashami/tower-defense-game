@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import { FONT, GAME_H, MAP_W, PANEL_W, TILE } from '../config/constants';
-import { ENEMIES } from '../config/enemies';
 import { SPELLS, SPELL_ORDER, type SpellKey } from '../config/spells';
-import { TOWER_ORDER, type TargetMode, type TowerDef, type TowerKey } from '../config/towers';
+import type { TargetMode, TowerDef } from '../config/towers';
+import type { TrapDef } from '../config/traps';
 import { Button } from '../ui/Button';
 import { isTouchDevice } from '../ui/touch';
 import { view } from '../ui/layout';
@@ -33,8 +33,15 @@ const MIN_ZOOM = 1.1;
 
 const TARGET_LABEL: Record<TargetMode, string> = { first: 'FIRST', strongest: 'STRONG', closest: 'CLOSE' };
 
+/** Shop slots: five rows, or a grid of up to eight smaller cards when a version brings more. */
+const SHOP_COLS_AT = 6;
+const CARD_W = (W - 4) / 2;
+const CARD_H = 38;
+const CARD_STEP = 41;
+
 interface ShopItem {
-  key: TowerKey;
+  key: string;
+  trap: boolean;
   button: Button;
   parts: Phaser.GameObjects.Components.Alpha[];
   lock: Phaser.GameObjects.Image;
@@ -61,6 +68,7 @@ export class UIScene extends Phaser.Scene {
   private pauseBtn!: Button;
   private quitBtn!: Button;
   private cancelBtn!: Button;
+  private repairBtn!: Button;
 
   constructor() {
     super('UI');
@@ -74,7 +82,7 @@ export class UIScene extends Phaser.Scene {
     this.previewTexts = [];
 
     const g = this.add.graphics();
-    g.fillStyle(0x1a1c2c, 1).fillRect(MAP_W, 0, PANEL_W, GAME_H);
+    g.fillStyle(this.gs.custom ? 0x1a1c2c : this.gs.content.theme.panel, 1).fillRect(MAP_W, 0, PANEL_W, GAME_H);
     g.fillStyle(0x333c57, 1).fillRect(MAP_W, 0, 2, GAME_H);
     g.fillStyle(0x262b3e, 1).fillRect(X, INFO_Y, W, INFO_H);
     g.lineStyle(1, 0x333c57, 1).strokeRect(X + 0.5, INFO_Y + 0.5, W - 1, INFO_H - 1);
@@ -88,7 +96,12 @@ export class UIScene extends Phaser.Scene {
     if (this.gs.custom) this.text(X + W - 2, 24, 'CUSTOM', '#73eff7').setOrigin(1, 0);
     else this.text(X + W - 2, 24, d.name.toUpperCase(), d.color).setOrigin(1, 0);
 
-    TOWER_ORDER.forEach((key, i) => this.makeShopItem(key, i, SHOP_Y + i * SHOP_STEP));
+    const items = [...this.gs.towerOrder.map((key) => ({ key, trap: false })), ...this.gs.trapOrder.map((key) => ({ key, trap: true }))];
+    const grid = items.length >= SHOP_COLS_AT;
+    items.slice(0, 8).forEach((item, i) => {
+      if (grid) this.makeShopCard(item.key, item.trap, i, X + (i % 2) * (CARD_W + 4), SHOP_Y + Math.floor(i / 2) * CARD_STEP);
+      else this.makeShopItem(item.key, item.trap, i, SHOP_Y + i * SHOP_STEP);
+    });
 
     this.infoTitle = this.text(X + 6, INFO_Y + 6, '', '#ffcd75');
     this.infoBody = this.text(X + 6, INFO_Y + 22, '', '#d0dae2').setLineSpacing(4).setWordWrapWidth(W - 12);
@@ -104,6 +117,7 @@ export class UIScene extends Phaser.Scene {
     this.sellBtn = new Button(this, { x: X, y: sellY, w: half, h: BTN_H, label: '', variant: 'danger', onClick: () => this.gs.sellSelected() });
     this.targetBtn = new Button(this, { x: X + half + 4, y: sellY, w: half, h: BTN_H, label: '', onClick: () => this.gs.cycleTargetSelected() });
     // Phones have no right-click or Esc, so placing a tower or aiming the meteor gets a button to stop.
+    this.repairBtn = new Button(this, { x: X, y: ACTION_Y, w: W, h: BTN_H, label: '', variant: 'primary', onClick: () => this.gs.repairSelected() });
     this.cancelBtn = new Button(this, { x: X, y: ACTION_Y, w: W, h: BTN_H, label: 'CANCEL', variant: 'danger', onClick: () => this.gs.cancelAll() });
     this.quitBtn = new Button(this, {
       x: X,
@@ -169,12 +183,13 @@ export class UIScene extends Phaser.Scene {
     this.waveText.setText(`WAVE ${Math.max(gs.waves.current, 1)}/${gs.waves.total}`);
 
     for (const item of this.shop) {
-      const def = gs.towerDefs[item.key];
-      const unlocked = gs.isUnlocked(item.key);
-      const affordable = money >= def.cost;
+      const trap = item.trap ? gs.content.traps[item.key] : null;
+      const cost = trap ? trap.cost : gs.towerDefs[item.key].cost;
+      const unlocked = trap ? gs.trapCount(item.key) < trap.max : gs.isUnlocked(item.key);
+      const affordable = money >= cost;
       item.button.setEnabled(unlocked && affordable && !gs.isOver).setActive(gs.placement.type === item.key);
       item.parts.forEach((p) => p.setAlpha(unlocked && affordable ? 1 : 0.4));
-      item.lock.setVisible(!unlocked);
+      item.lock.setVisible(!unlocked && !trap);
       item.lockText.setVisible(!unlocked);
     }
 
@@ -208,6 +223,7 @@ export class UIScene extends Phaser.Scene {
     this.upgradeBtn.setVisible(false);
     this.sellBtn.setVisible(false);
     this.targetBtn.setVisible(false);
+    this.repairBtn.setVisible(false);
 
     if (paused) {
       this.infoTitle.setText('PAUSED');
@@ -226,17 +242,38 @@ export class UIScene extends Phaser.Scene {
     if (t) {
       const next = t.isMaxLevel ? null : t.level + 1;
       this.infoTitle.setText(`${t.def.name.toUpperCase()} LV${t.level + 1}`);
-      this.infoBody.setText(statLines(t.def, t.level, next));
+      this.infoBody.setText(t.broken ? 'BROKEN!\n\nEnemies wrecked\nit. Repair it\nto shoot again.' : statLines(t.def, t.level, next));
       const cost = t.upgradeCost;
-      this.upgradeBtn
-        .setVisible(true)
-        .setLabel(cost === null ? 'MAX LEVEL' : `UPGRADE ${cost}`)
-        .setEnabled(cost !== null && gs.economy.canAfford(cost));
+      if (t.broken) {
+        this.repairBtn.setVisible(true).setLabel(`REPAIR ${t.repairCost}`).setEnabled(gs.economy.canAfford(t.repairCost));
+      } else {
+        this.upgradeBtn
+          .setVisible(true)
+          .setLabel(cost === null ? 'MAX LEVEL' : `UPGRADE ${cost}`)
+          .setEnabled(cost !== null && gs.economy.canAfford(cost));
+      }
       this.sellBtn.setVisible(true).setLabel(`SELL ${t.sellValue}`);
       this.targetBtn.setVisible(true).setLabel(TARGET_LABEL[t.targetMode]);
       return;
     }
+    const trap = gs.selectedTrap;
+    if (trap) {
+      this.infoTitle.setText(trap.def.name.toUpperCase());
+      this.infoBody.setText(trapLines(trap.def, trap.armed, trap.usesLeft));
+      if (trap.def.kind === 'bomb' && !trap.armed) {
+        this.repairBtn.setVisible(true).setLabel(`REARM ${trap.def.rearm}`).setEnabled(gs.economy.canAfford(trap.def.rearm));
+      }
+      this.sellBtn.setVisible(true).setLabel(`SELL ${trap.sellValue}`);
+      return;
+    }
     const placing = gs.placement.type;
+    if (placing && gs.placement.isTrap) {
+      const def = gs.content.traps[placing];
+      this.infoTitle.setText(def.name.toUpperCase());
+      const hint = gs.touchMode ? (gs.placement.hover ? 'Tap the same\nsquare again\nto lay it.' : 'Tap a road\nsquare.') : 'Click a road\nsquare.';
+      this.infoBody.setText(`${trapLines(def, true, def.uses)}\n\n${hint}`);
+      return;
+    }
     if (placing) {
       const def = gs.towerDefs[placing];
       this.infoTitle.setText(def.name.toUpperCase());
@@ -259,7 +296,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   /** One row per enemy type in the coming wave: icon, count and name. */
-  private showPreview(show: boolean, items: { enemy: keyof typeof ENEMIES; count: number }[] = []): void {
+  private showPreview(show: boolean, items: { enemy: string; count: number }[] = []): void {
     for (let i = 0; i < PREVIEW_ROWS; i++) {
       const item = show ? items[i] : undefined;
       const icon = this.previewIcons[i];
@@ -267,30 +304,75 @@ export class UIScene extends Phaser.Scene {
       icon.setVisible(!!item);
       text.setVisible(!!item);
       if (!item) continue;
-      const def = ENEMIES[item.enemy];
+      const def = this.gs.content.enemies[item.enemy];
+      if (!def) continue;
       icon.setTexture(`${def.texture}_0`).setScale(0.45);
+      if (def.tint !== undefined) icon.setTint(def.tint);
+      else icon.clearTint();
       text.setText(`${String(item.count).padStart(2)} ${def.name.toUpperCase()}`).setColor(def.boss ? '#ef7d57' : '#d0dae2');
     }
   }
 
-  private makeShopItem(key: TowerKey, index: number, y: number): void {
+  /** The picture for a shop slot: a tower's base and head, or a trap. */
+  private itemArt(key: string, trap: boolean, x: number, y: number, scale: number): Phaser.GameObjects.Image[] {
+    if (trap) {
+      const def = this.gs.content.traps[key];
+      const img = this.add.image(x, y, def.texture).setScale(scale);
+      if (def.tint !== undefined) img.setTint(def.tint);
+      return [img];
+    }
     const def = this.gs.towerDefs[key];
-    const button = new Button(this, { x: X, y, w: W, h: SHOP_H, onClick: () => this.gs.beginPlacement(key) });
+    const base = this.add.image(x, y, def.baseTexture).setScale(scale);
+    const head = this.add.image(x, y, def.headTexture).setScale(scale).setRotation(def.rotates ? -Math.PI / 4 : 0);
+    if (def.tint !== undefined) [base, head].forEach((i) => i.setTint(def.tint!));
+    return [base, head];
+  }
+
+  private pick(key: string, trap: boolean): void {
+    if (trap) this.gs.beginTrap(key);
+    else this.gs.beginPlacement(key);
+  }
+
+  private makeShopItem(key: string, trap: boolean, index: number, y: number): void {
+    const def: TowerDef | TrapDef = trap ? this.gs.content.traps[key] : this.gs.towerDefs[key];
+    const button = new Button(this, { x: X, y, w: W, h: SHOP_H, onClick: () => this.pick(key, trap) });
     const cy = y + SHOP_H / 2;
-    const base = this.add.image(X + 16, cy, def.baseTexture).setScale(0.8);
-    const head = this.add.image(X + 16, cy, def.headTexture).setScale(0.8).setRotation(def.rotates ? -Math.PI / 4 : 0);
+    const art = this.itemArt(key, trap, X + 16, cy, 0.8);
     const name = this.text(X + 34, y + 5, def.name.toUpperCase());
     const coin = this.add.image(X + 38, y + 21, 'icon_coin').setScale(0.75);
     const cost = this.text(X + 46, y + 17, String(def.cost), '#ffcd75');
     const hotkey = this.text(X + W - 10, y + 4, String(index + 1), '#566c86');
     const lock = this.add.image(X + W - 34, y + 21, 'icon_lock').setVisible(false);
-    const lockText = this.text(X + W - 24, y + 17, `W${def.unlockWave ?? ''}`, '#94b0c2').setVisible(false);
-    this.shop.push({ key, button, parts: [base, head, name, coin, cost, hotkey], lock, lockText });
+    const lockLabel = trap ? `MAX ${(def as TrapDef).max}` : `W${(def as TowerDef).unlockWave ?? ''}`;
+    const lockText = this.text(X + W - (trap ? 44 : 24), y + 17, lockLabel, '#94b0c2').setVisible(false);
+    this.shop.push({ key, trap, button, parts: [...art, name, coin, cost, hotkey], lock, lockText });
+  }
+
+  /** A smaller two-column card, used when the shop has six or more things. */
+  private makeShopCard(key: string, trap: boolean, index: number, x: number, y: number): void {
+    const def: TowerDef | TrapDef = trap ? this.gs.content.traps[key] : this.gs.towerDefs[key];
+    const button = new Button(this, { x, y, w: CARD_W, h: CARD_H, onClick: () => this.pick(key, trap) });
+    const art = this.itemArt(key, trap, x + 14, y + 14, 0.65);
+    const name = this.text(x + 4, y + 27, def.name.toUpperCase().slice(0, 8));
+    const coin = this.add.image(x + 32, y + 9, 'icon_coin').setScale(0.6);
+    const cost = this.text(x + 38, y + 5, String(def.cost), '#ffcd75');
+    const hotkey = this.text(x + CARD_W - 9, y + 16, String(index + 1), '#566c86');
+    const lock = this.add.image(x + 34, y + 20, 'icon_lock').setScale(0.75).setVisible(false);
+    const lockLabel = trap ? 'MAX' : `W${(def as TowerDef).unlockWave ?? ''}`;
+    const lockText = this.text(x + 42, y + 16, lockLabel, '#94b0c2').setVisible(false);
+    this.shop.push({ key, trap, button, parts: [...art, name, coin, cost, hotkey], lock, lockText });
   }
 
   private text(x: number, y: number, str: string, color = '#f4f4f4'): Phaser.GameObjects.Text {
     return this.add.text(x, y, str, { fontFamily: FONT, fontSize: '8px', color });
   }
+}
+
+/** What a trap does, for the info box. */
+function trapLines(def: TrapDef, armed: boolean, usesLeft: number): string {
+  if (def.kind === 'bomb') return `${armed ? 'READY' : 'USED UP'}\nDMG  ${def.damage}\nAREA ${(def.radius / TILE).toFixed(1)}`;
+  if (def.kind === 'spikes') return `DMG  ${def.damage}\nLEFT ${usesLeft}`;
+  return `SLOW ${Math.round((1 - def.slow) * 100)}%`;
 }
 
 /** Stat block for a tower level, with "> next" values when an upgrade exists. */
@@ -311,7 +393,7 @@ function statLines(def: TowerDef, level: number, next: number | null): string {
     lines.push(fmt('SLOW', pct(s.slow.factor), n?.slow ? pct(n.slow.factor) : undefined));
   }
   if (s.chain) lines.push(fmt('JUMP', String(s.chain.count), n?.chain ? String(n.chain.count) : undefined));
-  const tags = [def.hitsAir ? 'AIR' : 'GROUND', def.pierce ? 'PIERCE' : ''].filter(Boolean).join(' ');
+  const tags = [def.hitsAir ? 'AIR' : 'GROUND', def.pierce ? 'PIERCE' : '', def.reveal ? 'SEES' : ''].filter(Boolean).join(' ');
   lines.push(tags);
   return lines.join('\n');
 }

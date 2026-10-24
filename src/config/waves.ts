@@ -2,7 +2,8 @@ import type { EnemyKey } from './enemies';
 
 /** A batch of identical enemies within a wave. */
 export interface SpawnGroup {
-  enemy: EnemyKey;
+  /** A built-in EnemyKey or a version's enemy id. */
+  enemy: string;
   count: number;
   /** Seconds between each enemy in the group. */
   interval: number;
@@ -44,8 +45,8 @@ export const WAVES: WaveDef[] = [
 export const waveClearBonus = (waveNumber: number): number => 20 + 5 * waveNumber;
 
 /** How many of each enemy a wave sends, for the next-wave preview. */
-export function waveSummary(wave: WaveDef, countMult = 1): { enemy: EnemyKey; count: number }[] {
-  const totals = new Map<EnemyKey, number>();
+export function waveSummary(wave: WaveDef, countMult = 1): { enemy: string; count: number }[] {
+  const totals = new Map<string, number>();
   for (const grp of wave.groups) {
     const n = Math.max(1, Math.round(grp.count * countMult));
     totals.set(grp.enemy, (totals.get(grp.enemy) ?? 0) + n);

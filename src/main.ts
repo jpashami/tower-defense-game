@@ -7,9 +7,15 @@ import { EditorScene } from './scenes/EditorScene';
 import { GameOverScene } from './scenes/GameOverScene';
 import { GameScene } from './scenes/GameScene';
 import { MenuScene } from './scenes/MenuScene';
+import { PlayersScene } from './scenes/PlayersScene';
 import { UIScene } from './scenes/UIScene';
+import { VersionScene } from './scenes/VersionScene';
+import { initPlayers } from './profile/players';
 import { isTouchDevice } from './ui/touch';
 import { view, widthFor } from './ui/layout';
+import { readVersionFromAddress } from './version/incoming';
+import { setActiveVersion } from './version/registry';
+import { loadActiveVersion } from './version/store';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -23,7 +29,7 @@ const config: Phaser.Types.Core.GameConfig = {
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   // The DOM container lets the Creator show real text boxes for level names and share codes.
   dom: { createContainer: true },
-  scene: [BootScene, MenuScene, GameScene, UIScene, GameOverScene, EditorScene],
+  scene: [BootScene, MenuScene, GameScene, UIScene, GameOverScene, EditorScene, VersionScene, PlayersScene],
 };
 
 /** Wait briefly for the pixel font so text doesn't render in the fallback first. */
@@ -36,6 +42,12 @@ async function start(): Promise<void> {
   } catch {
     // Font loading failed: fall back to monospace.
   }
+  // Players and their chosen version, before any scene reads them.
+  initPlayers();
+  setActiveVersion(loadActiveVersion()?.data ?? null);
+  // A shared version in the address (#v=...) is offered on the title screen.
+  void readVersionFromAddress();
+  window.addEventListener('hashchange', () => void readVersionFromAddress());
   const holder = document.getElementById('game')!;
   view.width = widthFor(holder.clientWidth, holder.clientHeight);
   const game = new Phaser.Game({ ...config, width: view.width });

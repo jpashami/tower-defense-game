@@ -26,7 +26,7 @@ import { Button, type ButtonOptions } from '../ui/Button';
 import { isTouchDevice } from '../ui/touch';
 import { centreScene, fullScreenRect } from '../ui/layout';
 
-type Tool = 'path' | 'tree' | 'rock' | 'erase';
+type Tool = 'path' | 'water' | 'tree' | 'rock' | 'erase';
 interface Cell {
   col: number;
   row: number;
@@ -44,9 +44,10 @@ const CHART_COLORS: Record<CreatorEnemyKey, number> = { grunt: 0x38b764, runner:
 
 const TOOL_HINTS: Record<Tool, string> = {
   path: 'Click squares in a line from the left edge. The last one is the castle.',
+  water: 'Click to dig a river. A path over water becomes a bridge. Click again to fill it in.',
   tree: 'Click grass to plant a tree. Click it again to take it away.',
   rock: 'Click grass to drop a rock. Click it again to take it away.',
-  erase: 'Click a tree or rock to clear it. Click the path to cut it short.',
+  erase: 'Click a tree, rock or water to clear it. Click the path to cut it short.',
 };
 
 /**
@@ -159,22 +160,23 @@ export class EditorScene extends Phaser.Scene {
     this.text(X + 2, 7, 'CREATOR', '#ffcd75');
     this.nameBtn = new Button(this, { x: X, y: 20, w: W, h: 28, label: '', onClick: () => this.openName() });
 
-    const tools: { tool: Tool; label: string; icon?: string }[] = [
-      { tool: 'path', label: 'PATH', icon: 'tile_path_0' },
-      { tool: 'tree', label: 'TREE', icon: 'deco_tree' },
-      { tool: 'rock', label: 'ROCK', icon: 'deco_rock' },
-      { tool: 'erase', label: 'ERASE' },
+    // Path and water get wide buttons; tree, rock and erase share the second row.
+    const third = (W - 8) / 3;
+    const tools: { tool: Tool; label: string; icon?: string; x: number; y: number; w: number }[] = [
+      { tool: 'path', label: 'PATH', icon: 'tile_path_0', x: X, y: 52, w: HALF },
+      { tool: 'water', label: 'WATER', icon: 'tile_water_0', x: X + HALF + 8, y: 52, w: HALF },
+      { tool: 'tree', label: '', icon: 'deco_tree', x: X, y: 88, w: third },
+      { tool: 'rock', label: '', icon: 'deco_rock', x: X + third + 4, y: 88, w: third },
+      { tool: 'erase', label: 'ERASE', x: X + 2 * (third + 4), y: 88, w: third },
     ];
-    tools.forEach(({ tool, label, icon }, i) => {
-      const x = X + (i % 2) * (HALF + 8);
-      const y = 52 + Math.floor(i / 2) * 36;
-      const b = new Button(this, { x, y, w: HALF, h: 30, label, onClick: () => this.setTool(tool) });
+    for (const { tool, label, icon, x, y, w } of tools) {
+      const b = new Button(this, { x, y, w, h: 30, label, onClick: () => this.setTool(tool) });
       if (icon) {
-        this.add.image(x + 14, y + 15, icon).setScale(0.625);
-        b.label?.setX(x + 44);
+        this.add.image(label ? x + 14 : x + w / 2, y + 15, icon).setScale(0.625);
+        if (label) b.label?.setX(x + 42);
       }
       this.toolButtons.set(tool, b);
-    });
+    }
 
     this.undoBtn = new Button(this, { x: X, y: 124, w: HALF, h: 28, label: 'UNDO', onClick: () => this.undoPath() });
     this.clearBtn = new Button(this, {
@@ -300,7 +302,8 @@ export class EditorScene extends Phaser.Scene {
       o.destroy();
     }
     const corners = pathCorners(this.level.path);
-    this.mapObjects = renderMap(this, buildGrid(corners, this.level.decorations), corners, this.level.decorations);
+    const terrain = (this.level.water ?? []).map(([col, row]) => ({ col, row, kind: 'water' as const }));
+    this.mapObjects = renderMap(this, buildGrid(corners, this.level.decorations, { terrain }), corners, this.level.decorations);
   }
 
   private cellAt(p: Phaser.Input.Pointer): Cell | null {
@@ -356,6 +359,24 @@ export class EditorScene extends Phaser.Scene {
     return changed;
   }
 
+  private waterIndex(col: number, row: number): number {
+    return (this.level.water ?? []).findIndex(([c, r]) => c === col && r === row);
+  }
+
+  /** Digs or fills one water square; digging clears any tree or rock there. */
+  private setWater(col: number, row: number, wet: boolean): boolean {
+    const water = (this.level.water ??= []);
+    const i = this.waterIndex(col, row);
+    if (wet === i >= 0) return false;
+    if (wet) {
+      const d = this.decoIndex(col, row);
+      if (d >= 0) this.level.decorations.splice(d, 1);
+      water.push([col, row]);
+    } else water.splice(i, 1);
+    if (water.length === 0) delete this.level.water;
+    return true;
+  }
+
   private setDeco(col: number, row: number, kind: DecorationKind): void {
     const i = this.decoIndex(col, row);
     if (i >= 0) this.level.decorations[i].kind = kind;
@@ -388,9 +409,21 @@ export class EditorScene extends Phaser.Scene {
       return;
     }
 
+    if (this.tool === 'water') {
+      const wet = this.waterIndex(col, row) < 0;
+      this.setWater(col, row, wet);
+      this.dragMode = wet ? 'add' : 'remove';
+      this.changed();
+      return;
+    }
+
     if (this.tool === 'erase') {
       if (deco >= 0) {
         L.decorations.splice(deco, 1);
+        this.dragMode = 'remove';
+        this.changed();
+      } else if (this.waterIndex(col, row) >= 0) {
+        this.setWater(col, row, false);
         this.dragMode = 'remove';
         this.changed();
       } else if (onPath >= 0) {
@@ -402,6 +435,10 @@ export class EditorScene extends Phaser.Scene {
 
     if (onPath >= 0) {
       this.toast('NOT ON THE PATH!', '#ef7d57');
+      return;
+    }
+    if (this.waterIndex(col, row) >= 0) {
+      this.toast('NOT IN THE WATER!', '#ef7d57');
       return;
     }
     if (deco >= 0 && L.decorations[deco].kind === this.tool) {
@@ -425,6 +462,10 @@ export class EditorScene extends Phaser.Scene {
     let changed = false;
     if (this.tool === 'path') {
       changed = this.dragPathTo(col, row);
+    } else if (this.tool === 'water') {
+      changed = this.setWater(col, row, this.dragMode === 'add');
+    } else if (this.tool === 'erase' && this.dragMode === 'remove' && this.waterIndex(col, row) >= 0) {
+      changed = this.setWater(col, row, false);
     } else {
       const deco = this.decoIndex(col, row);
       if (this.dragMode === 'remove') {
@@ -432,7 +473,7 @@ export class EditorScene extends Phaser.Scene {
           this.level.decorations.splice(deco, 1);
           changed = true;
         }
-      } else if (this.tool !== 'erase' && this.pathIndex(col, row) < 0) {
+      } else if (this.tool !== 'erase' && this.pathIndex(col, row) < 0 && this.waterIndex(col, row) < 0) {
         this.setDeco(col, row, this.tool);
         changed = true;
       }
