@@ -2,6 +2,9 @@
  * Players on one device. Each player has their own versions, Creator levels and
  * settings: their keys in localStorage are prefixed with "pixel-td:<player id>:".
  * The first time this runs, saves from before players existed move into PLAYER 1.
+ *
+ * Family copies of the game hosted on the same github.io site share one localStorage,
+ * so each copy keeps its saves apart under its repository name (see saveSpaceFor).
  */
 
 export interface Player {
@@ -20,33 +23,74 @@ const CURRENT_KEY = 'pixel-td-player';
 /** Keys from before players existed, moved into the first player. */
 const LEGACY_KEYS = ['pixel-td-levels', 'pixel-td-draft', 'pixel-td-difficulty', 'pixel-td-map', 'pixel-td-shortcut'];
 
+/** The original game's repository. Its saves keep the plain keys they always had. */
+const ORIGINAL_REPO = 'tower-defense-game';
+/** Set in a copy's save space once the plain saves have been copied into it. */
+const MIGRATED_KEY = 'pixel-td-migrated';
+
+/**
+ * The prefix for this copy's saves: "pixel-td@<repo>/" on <name>.github.io/<repo>/,
+ * or "" for the original game, the dev server, the Android app and other hosts.
+ */
+export function saveSpaceFor(hostname: string, pathname: string): string {
+  if (!hostname.toLowerCase().endsWith('.github.io')) return '';
+  const repo = /^\/([A-Za-z0-9._-]{1,100})\//.exec(pathname)?.[1];
+  if (!repo || repo.toLowerCase() === ORIGINAL_REPO) return '';
+  return `pixel-td@${repo.toLowerCase()}/`;
+}
+
+let space = typeof location === 'undefined' ? '' : saveSpaceFor(location.hostname, location.pathname);
+
 /** Used when the browser blocks storage, so the game still runs (nothing is kept). */
 const memory = new Map<string, string>();
 
 function rawGet(key: string): string | null {
   try {
-    return localStorage.getItem(key);
+    return localStorage.getItem(space + key);
   } catch {
-    return memory.get(key) ?? null;
+    return memory.get(space + key) ?? null;
   }
 }
 
 function rawSet(key: string, value: string): boolean {
   try {
-    localStorage.setItem(key, value);
+    localStorage.setItem(space + key, value);
     return true;
   } catch {
-    memory.set(key, value);
+    memory.set(space + key, value);
     return false;
   }
 }
 
 function rawRemove(key: string): void {
   try {
-    localStorage.removeItem(key);
+    localStorage.removeItem(space + key);
   } catch {
-    memory.delete(key);
+    memory.delete(space + key);
   }
+}
+
+/**
+ * Switches to a copy's save space (tests use this too). The first time, saves made
+ * before copies had their own space are copied in; the originals are left alone,
+ * because another copy on the same site may still be using them.
+ */
+export function useSaveSpace(prefix: string): void {
+  space = prefix;
+  if (!space || rawGet(MIGRATED_KEY) !== null) return;
+  try {
+    if (rawGet(PLAYERS_KEY) === null) {
+      const plain: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('pixel-td') && !k.startsWith('pixel-td@')) plain.push(k);
+      }
+      for (const k of plain) rawSet(k, localStorage.getItem(k) ?? '');
+    }
+  } catch {
+    // Storage is blocked: nothing to copy.
+  }
+  rawSet(MIGRATED_KEY, '1');
 }
 
 /** Player names use the same safe letters as level names. */
@@ -81,6 +125,7 @@ function writePlayers(players: Player[]): void {
 
 /** Makes sure there is at least one player, moving old saves into it the first time. */
 export function initPlayers(): Player {
+  useSaveSpace(space);
   let players = listPlayers();
   if (players.length === 0) {
     const first: Player = { id: 'p1', name: 'PLAYER 1', color: PLAYER_COLORS[0] };
@@ -130,7 +175,7 @@ export function renamePlayer(id: string, name: string): void {
 export function removePlayer(id: string): void {
   const players = listPlayers();
   if (players.length <= 1) return;
-  const prefix = `pixel-td:${id}:`;
+  const prefix = `${space}pixel-td:${id}:`;
   try {
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const k = localStorage.key(i);

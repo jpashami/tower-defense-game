@@ -169,6 +169,34 @@ The full format, with every limit, is in the message ASK CLAUDE copies (built by
 - **Waves** (up to 30) and **rules**: starting gold and lives, how fast enemies toughen, their speed, rewards and numbers. Easy and Hard still work, relative to the version's rules.
 - **Map**: random (size, river with 1 to 3 bridges, shortcut, how wooded) or drawn as rows of characters: `.` grass, `#` road, `:` sand (slow), `I` ice (fast), `L` lava (burns), `~` water, `=` bridge, `T` forest, `^` rock, `*` flowers, `P` portal (1 or 2), `C` castle, `R` river start, `D` dock. Walkers cross water only on bridges; boats sail from `R` to `D`; flyers go straight. Medium (26x18) and large (32x22) maps open zoomed out to fit with a minimap in the corner; pinch, scroll or drag to look around, and tap the minimap to jump.
 
+## Ask for a new feature
+
+Some ideas need the game itself to change: a new kind of ability, a new game mode, a new screen. Anyone can ask for one, other families vote for the ones they like, and the owner decides what goes in.
+
+1. On the title screen, press **SUGGEST A FEATURE** and type the idea in your own words.
+2. Press **ASK CLAUDE**. The game copies a message for your own Claude chat, which asks a couple of questions and turns the idea into a clear request (or points out when MY VERSION can already do it).
+3. Press **OPEN THE FORM** and copy Claude's answers into the [feature request form](https://github.com/jpashami/tower-defense-game/issues/new?template=feature_request.yml) on GitHub. With no internet, the game shows the link to use later.
+
+Claude accounts are for adults (18+) and GitHub accounts for ages 13 and up, so a parent posts ideas for younger children. [CONTRIBUTING.md](CONTRIBUTING.md) explains voting, how ideas become build-ready prompts, and how volunteers build approved ideas with their own Claude Code.
+
+## Make your own copy
+
+Want to change the game itself, not just make a version? Make your own copy, with its own web address, and change anything with your own Claude Code. It costs nothing, and the original game is untouched. You need a GitHub account (13+) and a Claude account (18+), so a parent sets this up.
+
+1. **Copy the game.** Sign in to GitHub, open [jpashami/tower-defense-game](https://github.com/jpashami/tower-defense-game), press **Use this template**, then **Create a new repository**. Give it a name (say `our-tower-game`) and keep it **Public**.
+2. **Switch on your website.** In your new repository, open **Settings > Pages** and set **Source** to **GitHub Actions**. Then open the **Actions** tab and run **Deploy to GitHub Pages** (or just make your first change). After a few minutes your game is at `https://<your-github-name>.github.io/our-tower-game/`.
+3. **Change it with Claude Code.** Open [Claude Code on the web](https://claude.ai/code) with your own Claude account, connect GitHub, and pick your new repository. Nothing needs installing. Ask in plain words, or use the ready-made commands:
+   - `/new-tower a honey tower that makes enemies sticky`
+   - `/new-enemy a mole that digs under the road`
+   - `/change-look make the castle pink with a flag`
+   - `/my-share-link` finds your game's web address and checks it's published
+   - `/get-updates` brings in new features and fixes from the original game, keeping your changes
+
+   Claude reads [CLAUDE.md](CLAUDE.md) first, which explains how the game is built and what must keep working. It runs the tests and the build before saving your changes.
+4. **Publish.** When Claude pushes a change to `main`, your website rebuilds by itself within a few minutes.
+
+Each copy keeps its own saves, even when several copies live on the same `github.io` site. The first time a copy opens, it brings in any saves already on that site, so nobody loses their levels and versions. Built something everyone would enjoy? [Suggest it](CONTRIBUTING.md) for the original game.
+
 ## Towers and enemies
 
 Every tower has three levels. Lightning and Ballista are locked until their wave starts.
@@ -211,13 +239,14 @@ src/
   editor/              Creator levels: format, validation, share codes, saving
   version/             Family versions: format and limits, checker, compiler, drawn maps,
                        share links, the Claude prompt, summaries, examples, saving
-  profile/players.ts   Players on one device and their separate saves
+  profile/players.ts   Players on one device and their separate saves (and each copy's own saves)
+  community/           Suggest a feature: the form's link and the message for Claude
   dev/autoplay.ts      Test player for balancing (dev server only, see below)
   art/                 Pixel art drawn in code from shapes, no image files
   entities/            Enemy, Tower, Projectile
   systems/             Random map generator, wave spawning, economy, map drawing, placement, effects
   scenes/              Boot, Menu, Game, UI (HUD), GameOver, Editor (the Creator),
-                       Versions (make, paste, share), Players
+                       Versions (make, paste, share), Players, Suggest (ask for a feature)
   ui/Button.ts         Pixel-style button
   ui/touch.ts          Detects phones and tablets for tap hints
 public/
@@ -229,6 +258,10 @@ scripts/ts-hooks.mjs   Lets `npm test` run the TypeScript source directly in Nod
 tests/                 Tests for versions, links, players and share codes (`npm test`)
 android/               Android Studio project (Capacitor), see "Play on a phone"
 capacitor.config.ts    Android app id, name and the web folder it wraps
+.github/ISSUE_TEMPLATE/ Feature request and bug report forms
+CLAUDE.md              How the game is built, for Claude Code (read first)
+.claude/commands/      /new-tower, /new-enemy, /change-look, /get-updates, /my-share-link
+CONTRIBUTING.md        Asking for features, voting, and building approved ideas
 ```
 
 ## Changing the game
@@ -266,3 +299,13 @@ npm test
 ```
 
 Runs the tests in `tests/` with Node's own test runner (no browser): the version checker against garbage, huge numbers, unknown fields and script-like text, drawn and random maps (including that every classic map number still gives the same map), share links (round trips, broken and oversized links, zip bombs), players' separate saves, and Creator share codes.
+
+## Licence
+
+Pixel Tower Defence is free software: you can play it, copy it, change it and share it, under the [GNU General Public License, version 3 or (at your option) any later version](LICENSE) (GPL-3.0-or-later). Anyone who shares a changed copy must share it under the same licence, with its source code, so the game and every version of it stays free forever.
+
+Copyright (C) 2026 jpashami and contributors.
+
+- **Levels and versions** you share as Creator codes or links are shared under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+- **The Press Start 2P font** is by The Press Start 2P Project Authors (CodeMan38), under the SIL Open Font License 1.1 (`public/fonts/OFL.txt`).
+- **Libraries** the game is built with are under licences that work with the GPL: [Phaser](https://phaser.io) (MIT), [Capacitor](https://capacitorjs.com) (MIT), [vite-plugin-pwa](https://github.com/vite-pwa/vite-plugin-pwa) and Workbox (MIT), [Vite](https://vite.dev) (MIT) and [TypeScript](https://www.typescriptlang.org) (Apache-2.0, a build tool only, not part of the game).

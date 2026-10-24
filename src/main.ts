@@ -8,6 +8,7 @@ import { GameOverScene } from './scenes/GameOverScene';
 import { GameScene } from './scenes/GameScene';
 import { MenuScene } from './scenes/MenuScene';
 import { PlayersScene } from './scenes/PlayersScene';
+import { SuggestScene } from './scenes/SuggestScene';
 import { UIScene } from './scenes/UIScene';
 import { VersionScene } from './scenes/VersionScene';
 import { initPlayers } from './profile/players';
@@ -29,7 +30,7 @@ const config: Phaser.Types.Core.GameConfig = {
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   // The DOM container lets the Creator show real text boxes for level names and share codes.
   dom: { createContainer: true },
-  scene: [BootScene, MenuScene, GameScene, UIScene, GameOverScene, EditorScene, VersionScene, PlayersScene],
+  scene: [BootScene, MenuScene, GameScene, UIScene, GameOverScene, EditorScene, VersionScene, PlayersScene, SuggestScene],
 };
 
 /** Wait briefly for the pixel font so text doesn't render in the fallback first. */
