@@ -2,8 +2,33 @@ export type EnemyKey = 'grunt' | 'runner' | 'brute' | 'knight' | 'wolf' | 'shama
 /** The enemies Creator levels can use. Fixed so existing share codes keep working. */
 export type CreatorEnemyKey = 'grunt' | 'runner' | 'brute';
 
+/** When a triggered enemy ability goes off. Radii are in pixels. */
+export type EnemyTrigger =
+  | { kind: 'spawn' }
+  | { kind: 'hit' }
+  | { kind: 'death' }
+  | { kind: 'every'; seconds: number }
+  | { kind: 'below'; percent: number }
+  | { kind: 'near'; radius: number };
+
+/** What a triggered ability does. Distances are in pixels, amounts are fractions of max health. */
+export type EnemyAction =
+  | { type: 'spawn'; enemy: string; count: number }
+  | { type: 'teleport'; distance: number }
+  | { type: 'speed'; factor: number; duration: number }
+  | { type: 'explode'; radius: number; damage: number; stun: number }
+  | { type: 'shield'; amount: number }
+  | { type: 'cloak'; duration: number }
+  | { type: 'heal'; amount: number };
+
+export interface EnemyAbility {
+  when: EnemyTrigger;
+  action: EnemyAction;
+}
+
 export interface EnemyDef {
-  key: EnemyKey;
+  /** A built-in EnemyKey, or an id from a family version. */
+  key: string;
   name: string;
   /** One-line tip shown in the next-wave preview. */
   tip: string;
@@ -29,6 +54,21 @@ export interface EnemyDef {
   /** Sprite scale (bosses are drawn bigger). */
   scale?: number;
   boss?: boolean;
+  /** Hidden from towers unless one with `reveal` is close. */
+  stealth?: boolean;
+  /** Sails the water route instead of walking the road. */
+  boat?: boolean;
+  /** Health regained per second, as a fraction of max health. */
+  regen?: number;
+  /** Starts with a shield worth this fraction of max health; it soaks hits before health does. */
+  shield?: number;
+  /** Towers within the radius shoot slower: their reload runs at `factor` speed. */
+  slowAura?: { radius: number; factor: number };
+  /** Attacks the nearest tower in range. Towers have health and break at zero. */
+  attack?: { damage: number; range: number; rate: number };
+  abilities?: EnemyAbility[];
+  /** Colour wash over the sprite (versions that reuse a built-in look). */
+  tint?: number;
 }
 
 export const ENEMIES: Record<EnemyKey, EnemyDef> = {

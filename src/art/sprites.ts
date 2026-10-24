@@ -15,6 +15,26 @@ import {
   wolfRider,
   wyvern,
 } from './eliteSprites';
+import {
+  VERSION_ICONS,
+  bat,
+  boat,
+  bridgeTile,
+  dock,
+  flowers,
+  iceTile,
+  lavaTile,
+  projFire,
+  projMagic,
+  projPoison,
+  projRock,
+  sandTile,
+  slime,
+  trapBomb,
+  trapSpikes,
+  trapTar,
+  waterTile,
+} from './terrainSprites';
 
 /**
  * All game art, built in code at 32x32 (one tile) unless noted.
@@ -416,6 +436,8 @@ const ICONS: Record<string, string[]> = {
 
 export const GRASS_VARIANTS = 4;
 export const PATH_VARIANTS = 3;
+/** Variants for water, sand, ice and lava tiles. */
+export const SURFACE_VARIANTS = 3;
 
 /** Every texture the game uses, keyed by texture name. */
 export function buildSprites(): Record<string, SpriteSource> {
@@ -458,10 +480,34 @@ export function buildSprites(): Record<string, SpriteSource> {
     proj_ballista: one(projBallista()),
     gate: one(gate()),
     meteor: one(meteor()),
+    enemy_boat_0: one(boat(0)),
+    enemy_boat_1: one(boat(1)),
+    enemy_slime_0: one(slime(0)),
+    enemy_slime_1: one(slime(1)),
+    enemy_bat_0: one(bat(0)),
+    enemy_bat_1: one(bat(1)),
+    tile_bridge_h: one(bridgeTile('h')),
+    tile_bridge_v: one(bridgeTile('v')),
+    deco_flowers: one(flowers()),
+    dock: one(dock()),
+    trap_bomb: one(trapBomb(true)),
+    trap_bomb_spent: one(trapBomb(false)),
+    trap_spikes: one(trapSpikes()),
+    trap_tar: one(trapTar()),
+    proj_magic: one(projMagic()),
+    proj_fire: one(projFire()),
+    proj_poison: one(projPoison()),
+    proj_rock: one(projRock()),
   };
+  for (let i = 0; i < SURFACE_VARIANTS; i++) {
+    out[`tile_water_${i}`] = one(waterTile(211 + i * 19));
+    out[`tile_sand_${i}`] = one(sandTile(311 + i * 23));
+    out[`tile_ice_${i}`] = one(iceTile(401 + i * 29));
+    out[`tile_lava_${i}`] = one(lavaTile(601 + i * 37));
+  }
   for (let i = 0; i < GRASS_VARIANTS; i++) out[`tile_grass_${i}`] = one(grassTile(101 + i * 17));
   for (let i = 0; i < PATH_VARIANTS; i++) out[`tile_path_${i}`] = one(pathTile(503 + i * 31));
   for (let i = 0; i < PATH_VARIANTS; i++) out[`tile_shortcut_${i}`] = one(shortcutTile(907 + i * 13));
-  for (const [key, grid] of Object.entries({ ...ICONS, ...ELITE_ICONS })) out[key] = { grid, scale: 2 };
+  for (const [key, grid] of Object.entries({ ...ICONS, ...ELITE_ICONS, ...VERSION_ICONS })) out[key] = { grid, scale: 2 };
   return out;
 }

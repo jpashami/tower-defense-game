@@ -1,15 +1,16 @@
 import Phaser from 'phaser';
 import { DEPTH } from '../config/constants';
-import type { TowerKey, TowerStats } from '../config/towers';
+import type { TowerDef, TowerStats } from '../config/towers';
 import type { Enemy } from './Enemy';
 
 /** A shot that homes on its target. If the target dies first, it lands where the target was. */
 export class Projectile extends Phaser.GameObjects.Image {
-  readonly kind: TowerKey;
+  readonly tower: TowerDef;
   readonly stats: TowerStats;
   readonly target: Enemy;
-  /** Ignores armour (Ballista bolts). */
-  readonly pierce: boolean;
+  /** Damage this shot deals (after any critical hit). */
+  readonly damage: number;
+  readonly crit: boolean;
   done = false;
   tx: number;
   ty: number;
@@ -18,27 +19,25 @@ export class Projectile extends Phaser.GameObjects.Image {
   private travelled = 0;
   private readonly arcs: boolean;
 
-  constructor(
-    scene: Phaser.Scene,
-    x: number,
-    y: number,
-    texture: string,
-    kind: TowerKey,
-    stats: TowerStats,
-    target: Enemy,
-    pierce = false,
-  ) {
-    super(scene, x, y, texture);
-    this.kind = kind;
+  constructor(scene: Phaser.Scene, x: number, y: number, tower: TowerDef, stats: TowerStats, target: Enemy, damage: number, crit = false) {
+    super(scene, x, y, tower.projectileTexture);
+    this.tower = tower;
     this.stats = stats;
     this.target = target;
-    this.pierce = pierce;
+    this.damage = damage;
+    this.crit = crit;
     this.tx = target.pos.x;
     this.ty = target.aimY;
     this.startDist = Math.max(1, Math.hypot(this.tx - x, this.ty - y));
-    this.arcs = kind === 'cannon';
+    this.arcs = tower.shot === 'shell' || tower.shot === 'rock';
+    if (tower.shotTint !== undefined) this.setTint(tower.shotTint);
     this.setDepth(DEPTH.projectile);
     scene.add.existing(this);
+  }
+
+  /** Ignores armour (Ballista bolts). */
+  get pierce(): boolean {
+    return this.tower.pierce === true;
   }
 
   /** Moves the shot; returns true on the frame it lands. */

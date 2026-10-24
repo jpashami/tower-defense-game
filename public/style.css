@@ -1,0 +1,26 @@
+/* Page styles. Kept in a file (not inline) so the Content-Security-Policy can stay strict. */
+
+/* The pixel font ships with the game (public/fonts, SIL OFL) so it works offline. */
+@font-face {
+  font-family: 'Press Start 2P';
+  src: url('fonts/PressStart2P-Regular.ttf') format('truetype');
+  font-display: block;
+}
+html, body { margin: 0; padding: 0; height: 100%; background: #1a1c2c; overflow: hidden; }
+body { touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+/* iOS will not let you type in a box that inherits user-select: none. */
+input, textarea { -webkit-user-select: text; user-select: text; }
+/* dvh is the height actually visible on phones, between the browser's bars. */
+#game { width: 100%; height: 100%; height: 100dvh; }
+canvas { image-rendering: pixelated; }
+#rotate { display: none; }
+/* Phones held upright: the game is landscape only. */
+@media (orientation: portrait) and (pointer: coarse) {
+  #rotate {
+    display: flex; position: fixed; inset: 0; z-index: 10;
+    flex-direction: column; align-items: center; justify-content: center; gap: 24px;
+    background: #1a1c2c; color: #ffcd75; text-align: center;
+    font: 12px/2 'Press Start 2P', monospace;
+  }
+  #rotate span { font-size: 40px; color: #73eff7; }
+}

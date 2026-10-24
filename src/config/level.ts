@@ -1,5 +1,5 @@
-import { generateMap, type ShortcutDef } from '../systems/MapGenerator';
-import { DECORATIONS, PATH_TILES, type Decoration } from './map';
+import { generateMap, type MapOptions, type ShortcutDef } from '../systems/MapGenerator';
+import { DECORATIONS, PATH_TILES, type Decoration, type TerrainTile } from './map';
 import { TOWERS, type TowerDef, type TowerKey } from './towers';
 import { WAVES, type WaveDef } from './waves';
 
@@ -14,8 +14,17 @@ export interface TowerTuning {
 /** Everything the game needs to play one level. */
 export interface LevelDef {
   name: string;
-  /** Path corners in tile coordinates; the first sits just off the left edge. */
+  /** Map size in tiles; the classic 20x15 when unset. */
+  cols?: number;
+  rows?: number;
+  /** Path corners in tile coordinates; the first is the portal (or just off the left edge), the last the castle. */
   path: [number, number][];
+  /** Routes from a second portal, ending at the same castle. */
+  extraPaths?: [number, number][][];
+  /** Water, sand, ice and lava. */
+  terrain?: TerrainTile[];
+  /** The boats' route as corners, from the river start to the dock. */
+  boatRoute?: [number, number][];
   decorations: Decoration[];
   waves: WaveDef[];
   /** Changes to the default towers; missing towers keep their defaults. */
@@ -38,13 +47,17 @@ export const BUILTIN_LEVEL: LevelDef = {
 };
 
 /** A freshly generated map with the standard campaign waves. */
-export function randomLevel(seed: number): LevelDef {
-  const map = generateMap(seed);
+export function randomLevel(seed: number, opts: MapOptions = {}, waves: WaveDef[] = WAVES): LevelDef {
+  const map = generateMap(seed, opts);
   return {
     name: `MAP ${seed}`,
+    cols: map.cols,
+    rows: map.rows,
     path: map.corners,
     decorations: map.decorations,
-    waves: WAVES,
+    terrain: map.terrain,
+    boatRoute: map.boatRoute ?? undefined,
+    waves,
     shortcut: map.shortcut,
     seed,
   };
@@ -57,8 +70,8 @@ export function defaultTuning(key: TowerKey): TowerTuning {
 }
 
 /** Tower definitions with a level's tuning applied. */
-export function levelTowers(level: LevelDef): Record<TowerKey, TowerDef> {
-  const out = { ...TOWERS };
+export function levelTowers(level: LevelDef): Record<string, TowerDef> {
+  const out: Record<string, TowerDef> = { ...TOWERS };
   for (const [key, tune] of Object.entries(level.towers ?? {}) as [TowerKey, TowerTuning][]) {
     const def = TOWERS[key];
     const base = defaultTuning(key);

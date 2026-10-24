@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { BETWEEN_WAVES, COLS, ROWS } from '../config/constants';
+import { BETWEEN_WAVES } from '../config/constants';
 import type { DifficultyKey } from '../config/difficulty';
 import { tileCenter, type Point } from '../config/map';
 import type { MapMode } from '../config/settings';
@@ -7,6 +7,10 @@ import { METEOR } from '../config/spells';
 import type { TowerKey } from '../config/towers';
 import type { GameScene } from '../scenes/GameScene';
 import { fx } from '../systems/Effects';
+import { EXAMPLE_VERSIONS } from '../version/examples';
+import { setActiveVersion } from '../version/registry';
+import { loadActiveVersion } from '../version/store';
+import { checkVersion } from '../version/validate';
 
 /**
  * Development-only test player used to balance the difficulty levels.
@@ -28,6 +32,8 @@ export interface SimOptions {
   strategy: Strategy;
   seed?: number;
   map?: MapMode;
+  /** Play one of the example family versions (src/version/examples.ts) instead of the default game. */
+  version?: string;
 }
 
 export interface SimResult {
@@ -71,7 +77,7 @@ class Bot {
     private readonly strategy: Strategy,
     seed: number,
   ) {
-    this.pts = [...samples(gs.mainRoute), ...samples(gs.shortcutRoute ?? [])];
+    this.pts = [...samples(gs.mainRoute), ...samples(gs.shortcutRoute ?? []), ...samples(gs.boatRoute ?? []), ...gs.extraRoutes.flatMap(samples)];
     const r = gs.mainRoute;
     this.airPts = samples([r[0], r[r.length - 1]]);
     let s = seed * 31 + 7;
@@ -97,8 +103,8 @@ class Bot {
 
   private bestTile(range: number, air: boolean): { col: number; row: number } | null {
     const options: { col: number; row: number; score: number }[] = [];
-    for (let row = 0; row < ROWS; row++) {
-      for (let col = 0; col < COLS; col++) {
+    for (let row = 0; row < this.gs.rows; row++) {
+      for (let col = 0; col < this.gs.cols; col++) {
         if (!this.gs.isBuildable(col, row)) continue;
         options.push({ col, row, score: this.coverage(col, row, range, air) });
       }
@@ -129,8 +135,9 @@ class Bot {
         return true;
       }
     }
-    const cycle = CYCLES[this.strategy];
-    let key: TowerKey | null = null;
+    // Versions with their own towers: the bot just cycles through their shop.
+    const cycle: string[] = CYCLES[this.strategy].every((k) => gs.towerOrder.includes(k)) ? CYCLES[this.strategy] : gs.towerOrder;
+    let key: string | null = null;
     for (let k = 0; k < cycle.length; k++) {
       const candidate = cycle[(this.cycle + k) % cycle.length];
       if (gs.isUnlocked(candidate)) {
@@ -178,7 +185,8 @@ export function simulate(game: Phaser.Game, opts: SimOptions): SimResult {
   fx.enabled = false;
   const scenes = game.scene;
   game.loop.sleep();
-  for (const key of ['GameOver', 'UI', 'Menu', 'Editor']) if (scenes.isActive(key) || scenes.isPaused(key)) scenes.stop(key);
+  for (const key of ['GameOver', 'UI', 'Menu', 'Editor', 'Versions', 'Players']) if (scenes.isActive(key) || scenes.isPaused(key)) scenes.stop(key);
+  setActiveVersion(useVersion(opts.version));
   scenes.start('Game', { difficulty: opts.difficulty, seed, map: opts.map ?? 'random' });
   let t = performance.now();
   for (let k = 0; k < 4; k++) game.step((t += 16.7), 16.7);
@@ -199,6 +207,14 @@ export function simulate(game: Phaser.Game, opts: SimOptions): SimResult {
   game.loop.wake();
   fx.enabled = true;
   return { seed, won: gs.phase === 'won', wave: gs.waves.current, lives: gs.economy.lives, livesAtWave, leaks: { ...gs.leaks } };
+}
+
+/** A checked example version by key, or null for the default game. */
+function useVersion(key?: string) {
+  if (!key) return null;
+  const r = checkVersion(EXAMPLE_VERSIONS[key]);
+  if (!r.ok) throw new Error(`No example version "${key}"`);
+  return r.version;
 }
 
 /** Plays several games and summarises them. */
@@ -227,6 +243,7 @@ export function install(game: Phaser.Game): void {
   const w = window as unknown as Record<string, unknown>;
   // Leave the title screen showing afterwards rather than a half-finished test game.
   const backToMenu = <T>(result: T): T => {
+    setActiveVersion(loadActiveVersion()?.data ?? null);
     game.scene.stop('UI');
     game.scene.stop('Game');
     game.scene.start('Menu');
@@ -235,4 +252,10 @@ export function install(game: Phaser.Game): void {
   w.simulate = (opts: SimOptions) => backToMenu(simulate(game, opts));
   w.simulateMany = (opts: Omit<SimOptions, 'seed'> & { games?: number; seeds?: number[] }) =>
     backToMenu(simulateMany(game, opts));
+  // Opens an example version in a real game, e.g. playExample('river_raid').
+  w.playExample = (key: string) => {
+    setActiveVersion(useVersion(key));
+    for (const k of ['GameOver', 'UI', 'Game', 'Menu', 'Versions']) game.scene.stop(k);
+    game.scene.start('Game', {});
+  };
 }

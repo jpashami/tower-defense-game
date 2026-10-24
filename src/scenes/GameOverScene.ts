@@ -16,6 +16,8 @@ interface GameOverData {
   custom?: CustomLevel;
   seed: number;
   map: MapMode;
+  /** Name of the family version that was played, if any. */
+  version?: string;
 }
 
 /** Overlay shown on top of the paused game when it ends. */
@@ -50,7 +52,7 @@ export class GameOverScene extends Phaser.Scene {
       : `The castle fell on wave ${data.wave}.`;
     this.add.text(cx, 206, sub, style(8, '#f4f4f4')).setOrigin(0.5).setLineSpacing(8);
     if (data.custom) this.add.text(cx, 240, `LEVEL: ${data.custom.name}`, style(8, '#73eff7')).setOrigin(0.5);
-    else this.add.text(cx, 240, `DIFFICULTY: ${level.name.toUpperCase()}`, style(8, level.color)).setOrigin(0.5);
+    else this.add.text(cx, 240, `${data.version ? `${data.version} - ` : 'DIFFICULTY: '}${level.name.toUpperCase()}`, style(8, level.color)).setOrigin(0.5);
 
     const leave = (scene: string, sceneData?: object) => {
       this.scene.stop('UI');

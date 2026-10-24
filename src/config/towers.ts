@@ -20,8 +20,15 @@ export interface TowerStats {
   chain?: { count: number; range: number };
 }
 
+/** How a tower's shots look and land. Shells and rocks are lobbed. */
+export type ShotLook = 'arrow' | 'shell' | 'frost' | 'bolt' | 'magic' | 'fire' | 'poison' | 'rock';
+
+/** Tower health before upgrades; only matters when enemies can attack towers. */
+export const TOWER_HP = 100;
+
 export interface TowerDef {
-  key: TowerKey;
+  /** A built-in TowerKey, or an id from a family version. */
+  key: string;
   name: string;
   description: string;
   cost: number;
@@ -42,6 +49,28 @@ export interface TowerDef {
   /** The shop keeps this tower locked until this wave has started. */
   unlockWave?: number;
   defaultTarget: TargetMode;
+  shot: ShotLook;
+  /** Health at level 1 (default TOWER_HP); each upgrade adds half again. */
+  hp?: number;
+  /** Sets enemies on fire (or poisons them): damage per second for a few seconds. Ignores armour. */
+  burn?: { dps: number; duration: number };
+  /** Leaves a poison cloud where shots land. Radius in pixels. */
+  cloud?: { dps: number; radius: number; duration: number };
+  /** Pushes enemies back along their route by this many pixels. */
+  knockback?: number;
+  /** Chance to stun (freeze) an enemy for a moment. */
+  stun?: { chance: number; duration: number };
+  /** Enemies within the radius always walk slower. */
+  slowAura?: { radius: number; factor: number };
+  /** Lets every tower see stealthy enemies within this many pixels of this one. */
+  reveal?: number;
+  /** Shoots this many different enemies at once. */
+  multiShot?: number;
+  /** Chance of a critical hit that multiplies damage. */
+  crit?: { chance: number; mult: number };
+  /** Colour wash over the tower's sprites and shots (versions reusing a built-in look). */
+  tint?: number;
+  shotTint?: number;
 }
 
 export const TOWERS: Record<TowerKey, TowerDef> = {
@@ -58,6 +87,7 @@ export const TOWERS: Record<TowerKey, TowerDef> = {
     ],
     baseTexture: 'base_archer',
     headTexture: 'head_archer',
+    shot: 'arrow',
     projectileTexture: 'proj_archer',
     rotates: true,
     hitsAir: true,
@@ -76,6 +106,7 @@ export const TOWERS: Record<TowerKey, TowerDef> = {
     ],
     baseTexture: 'base_cannon',
     headTexture: 'head_cannon',
+    shot: 'shell',
     projectileTexture: 'proj_cannon',
     rotates: true,
     hitsAir: false,
@@ -94,6 +125,7 @@ export const TOWERS: Record<TowerKey, TowerDef> = {
     ],
     baseTexture: 'base_frost',
     headTexture: 'head_frost',
+    shot: 'frost',
     projectileTexture: 'proj_frost',
     rotates: false,
     hitsAir: false,
@@ -112,6 +144,7 @@ export const TOWERS: Record<TowerKey, TowerDef> = {
     ],
     baseTexture: 'base_lightning',
     headTexture: 'head_lightning',
+    shot: 'bolt',
     projectileTexture: 'px',
     rotates: false,
     hitsAir: true,
@@ -132,6 +165,7 @@ export const TOWERS: Record<TowerKey, TowerDef> = {
     ],
     baseTexture: 'base_ballista',
     headTexture: 'head_ballista',
+    shot: 'bolt',
     projectileTexture: 'proj_ballista',
     rotates: true,
     hitsAir: true,
@@ -142,7 +176,7 @@ export const TOWERS: Record<TowerKey, TowerDef> = {
 };
 
 /** Shop order; also the 1-5 hotkeys. */
-export const TOWER_ORDER: TowerKey[] = ['archer', 'cannon', 'frost', 'lightning', 'ballista'];
+export const TOWER_ORDER: string[] = ['archer', 'cannon', 'frost', 'lightning', 'ballista'];
 
 /** The towers Creator levels can tune. Fixed so existing share codes keep working. */
 export type CreatorTowerKey = 'archer' | 'cannon' | 'frost';

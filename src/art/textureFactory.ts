@@ -10,6 +10,7 @@ export function makePixelTexture(
   key: string,
   grid: string[],
   scale: number,
+  palette: Record<string, string> = PALETTE,
 ): void {
   if (scene.textures.exists(key)) return;
   const height = grid.length;
@@ -23,7 +24,7 @@ export function makePixelTexture(
     for (let x = 0; x < row.length; x++) {
       const ch = row[x];
       if (ch === '.' || ch === ' ') continue;
-      const colour = PALETTE[ch];
+      const colour = palette[ch];
       if (!colour) {
         console.warn(`Unknown palette char "${ch}" in sprite "${key}"`);
         continue;

@@ -1,3 +1,5 @@
+import { playerGet, playerSet } from '../profile/players';
+
 export type DifficultyKey = 'easy' | 'normal' | 'hard';
 
 export interface DifficultyDef {
@@ -80,23 +82,12 @@ export function killReward(d: DifficultyDef, baseReward: number): number {
   return Math.max(1, Math.round(baseReward * d.rewardMult));
 }
 
-const STORAGE_KEY = 'pixel-td-difficulty';
-
-/** Last difficulty the player picked, remembered in the browser. */
+/** Last difficulty the current player picked. */
 export function loadDifficulty(): DifficultyKey {
-  try {
-    const v = localStorage.getItem(STORAGE_KEY);
-    if (v && v in DIFFICULTIES) return v as DifficultyKey;
-  } catch {
-    // Storage blocked (private window etc.): use the default.
-  }
-  return DEFAULT_DIFFICULTY;
+  const v = playerGet('difficulty');
+  return v && v in DIFFICULTIES ? (v as DifficultyKey) : DEFAULT_DIFFICULTY;
 }
 
 export function saveDifficulty(key: DifficultyKey): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, key);
-  } catch {
-    // Not critical.
-  }
+  playerSet('difficulty', key);
 }

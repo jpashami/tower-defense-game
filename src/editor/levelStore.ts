@@ -1,12 +1,13 @@
+import { playerGet, playerSet } from '../profile/players';
 import { cloneLevel, normaliseLevel, type CustomLevel } from './customLevel';
 
-/** Saved Creator levels live in this browser's storage. */
-const STORAGE_KEY = 'pixel-td-levels';
+/** Saved Creator levels live in this browser's storage, separately for each player. */
+const STORAGE_KEY = 'levels';
 export const MAX_SAVED = 6;
 
 export function listLevels(): CustomLevel[] {
   try {
-    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]') as unknown;
+    const raw = JSON.parse(playerGet(STORAGE_KEY) ?? '[]') as unknown;
     if (!Array.isArray(raw)) return [];
     return raw.map(normaliseLevel).filter((l): l is CustomLevel => l !== null && !!l.id);
   } catch {
@@ -16,12 +17,7 @@ export function listLevels(): CustomLevel[] {
 }
 
 function write(levels: CustomLevel[]): boolean {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(levels));
-    return true;
-  } catch {
-    return false;
-  }
+  return playerSet(STORAGE_KEY, JSON.stringify(levels));
 }
 
 export type SaveResult = { ok: true; level: CustomLevel } | { ok: false; reason: 'full' | 'storage' };
@@ -45,11 +41,11 @@ export function deleteLevel(id: string): void {
 }
 
 /** The level open in the Creator, kept so work survives a page reload even when not saved. */
-const DRAFT_KEY = 'pixel-td-draft';
+const DRAFT_KEY = 'draft';
 
 export function loadDraft(): CustomLevel | null {
   try {
-    const raw = localStorage.getItem(DRAFT_KEY);
+    const raw = playerGet(DRAFT_KEY);
     return raw ? normaliseLevel(JSON.parse(raw)) : null;
   } catch {
     return null;
@@ -57,11 +53,7 @@ export function loadDraft(): CustomLevel | null {
 }
 
 export function saveDraft(level: CustomLevel): void {
-  try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(level));
-  } catch {
-    // Not critical.
-  }
+  playerSet(DRAFT_KEY, JSON.stringify(level));
 }
 
 /** Whether the level matches what is stored in its save slot. */
