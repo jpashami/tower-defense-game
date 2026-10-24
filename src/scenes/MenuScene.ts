@@ -15,7 +15,7 @@ import { isTouchDevice } from '../ui/touch';
 import { difficultyFor, type GameContent } from '../version/compile';
 import { onIncoming, takeIncoming } from '../version/incoming';
 import { isRandomPlan, levelForContent } from '../version/levels';
-import { activeContent } from '../version/registry';
+import { activeContent, isTryingVersion, useSavedVersion } from '../version/registry';
 import { ensureVersionTextures } from '../version/textures';
 
 /** Title screen: a preview of the next map with enemies wandering behind the menu. */
@@ -47,6 +47,8 @@ export class MenuScene extends Phaser.Scene {
     this.mapObjects = [];
     this.spawnTimer = 0;
     this.spawnCount = 0;
+    // Back from trying out an example or a shared link: return to the player's own choice.
+    if (isTryingVersion()) useSavedVersion();
     this.content = activeContent();
     ensureVersionTextures(this, this.content);
     this.difficulty = loadDifficulty();

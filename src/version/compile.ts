@@ -3,7 +3,7 @@ import { TILE } from '../config/constants';
 import { DIFFICULTIES, type DifficultyDef, type DifficultyKey } from '../config/difficulty';
 import { ENEMIES, type EnemyAbility, type EnemyAction, type EnemyDef, type EnemyTrigger } from '../config/enemies';
 import { TOWER_ORDER, TOWERS, type ShotLook, type TargetMode, type TowerDef, type TowerStats } from '../config/towers';
-import { TRAPS, type TrapDef, type TrapKind } from '../config/traps';
+import { TRAPS, type TrapDef } from '../config/traps';
 import { WAVES, type WaveDef } from '../config/waves';
 import type { MapOptions } from '../systems/MapGenerator';
 import { parseDrawnMap, type DrawnMap } from './drawnMap';
@@ -82,6 +82,11 @@ export function versionHash(v: VersionData): string {
 }
 
 const tiles = (t: number): number => Math.round(t * TILE);
+
+/** A table entry only if the table itself has it, never something every object inherits. */
+function own<T>(table: Record<string, T>, key: string | undefined): T | undefined {
+  return key !== undefined && Object.prototype.hasOwnProperty.call(table, key) ? table[key] : undefined;
+}
 
 /** The difficulty for a game: the chosen level, re-centred on a version's own rules. */
 export function difficultyFor(key: DifficultyKey, rules: GameRules | null): DifficultyDef {
@@ -186,11 +191,11 @@ export function compileVersion(v: VersionData): GameContent {
 }
 
 function compileEnemy(e: VEnemy, vid: string, addSprite: (key: string, grid: Grid) => void): EnemyDef {
-  const builtin = ENEMIES[(e.base ?? e.id) as keyof typeof ENEMIES];
+  const builtin = own<EnemyDef>(ENEMIES, e.base ?? e.id);
   const base: EnemyDef = builtin ?? { ...ENEMIES.grunt, tip: 'A new enemy.', armor: undefined };
   const isBoat = !!e.abilities?.some((a) => a.type === 'boat');
   const lookKey = e.look ?? e.base ?? (builtin ? e.id : isBoat ? 'boat' : 'grunt');
-  const lookTexture = ENEMIES[lookKey as keyof typeof ENEMIES]?.texture ?? `enemy_${lookKey}`;
+  const lookTexture = own<EnemyDef>(ENEMIES, lookKey)?.texture ?? `enemy_${lookKey}`;
   const tint = parseColour(e.color);
   const def: EnemyDef = {
     ...base,
@@ -280,18 +285,23 @@ const SHOT_TEXTURE: Record<ShotLook, string> = {
 };
 
 function compileTower(t: VTower, vid: string, addSprite: (key: string, grid: Grid) => void): TowerDef {
-  const builtin = TOWERS[(t.base ?? t.id) as keyof typeof TOWERS];
-  const look = TOWERS[(t.look ?? t.base ?? (builtin ? t.id : 'archer')) as keyof typeof TOWERS] ?? TOWERS.archer;
+  const builtin = own<TowerDef>(TOWERS, t.base ?? t.id);
+  const look = own<TowerDef>(TOWERS, t.look ?? t.base ?? (builtin ? t.id : 'archer')) ?? TOWERS.archer;
   const shot: ShotLook = (t.shot as ShotLook | undefined) ?? builtin?.shot ?? look.shot;
   const cost = t.cost ?? builtin?.cost ?? 60;
   const levels: TowerStats[] = t.levels?.length
-    ? t.levels.map((l) => ({
-        damage: l.damage,
-        range: tiles(l.range),
-        cooldown: Math.round((1 / l.rate) * 1000) / 1000,
-        projectileSpeed: SHOT_SPEED[shot],
-        splash: tiles(l.splash ?? 0),
-      }))
+    ? t.levels.map((l, i) => {
+        // Start from the matching built-in level, so a Frost keeps its chill and a Lightning its jumps.
+        const from = builtin?.levels[Math.min(i, builtin.levels.length - 1)];
+        return {
+          ...from,
+          damage: l.damage,
+          range: tiles(l.range),
+          cooldown: Math.round((1 / l.rate) * 1000) / 1000,
+          projectileSpeed: from && !t.shot ? from.projectileSpeed : SHOT_SPEED[shot],
+          splash: tiles(l.splash ?? 0),
+        };
+      })
     : (builtin?.levels ?? [{ damage: 12, range: 96, cooldown: 0.8, projectileSpeed: SHOT_SPEED[shot], splash: 0 }]).map((l) => ({ ...l }));
   const upgradeCosts = Array.from({ length: levels.length - 1 }, (_, i) =>
     t.upgrades?.[i] ?? builtin?.upgradeCosts[i] ?? Math.round(cost * (i === 0 ? 1.4 : 2.8)),
@@ -357,7 +367,7 @@ function compileTower(t: VTower, vid: string, addSprite: (key: string, grid: Gri
 }
 
 function compileTrap(t: VTrap): TrapDef {
-  const base = TRAPS[t.kind as TrapKind];
+  const base = own<TrapDef>(TRAPS, t.kind) ?? TRAPS.tar;
   return {
     ...base,
     key: t.id,

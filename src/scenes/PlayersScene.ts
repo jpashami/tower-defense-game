@@ -14,8 +14,7 @@ import {
 import { Button, type ButtonOptions } from '../ui/Button';
 import { centreScene, fullScreenRect } from '../ui/layout';
 import { textBoxStyle } from '../ui/textBox';
-import { setActiveVersion } from '../version/registry';
-import { loadActiveVersion } from '../version/store';
+import { setActiveVersion, useSavedVersion } from '../version/registry';
 
 const CX = GAME_W / 2;
 
@@ -84,7 +83,7 @@ export class PlayersScene extends Phaser.Scene {
             }
             removePlayer(p.id);
             this.armedRemove = null;
-            setActiveVersion(loadActiveVersion()?.data ?? null);
+            useSavedVersion();
             this.showList();
           },
         }).setActive(this.armedRemove === p.id);
@@ -100,7 +99,7 @@ export class PlayersScene extends Phaser.Scene {
 
   private pick(id: string): void {
     switchPlayer(id);
-    setActiveVersion(loadActiveVersion()?.data ?? null);
+    useSavedVersion();
     this.scene.start('Menu');
   }
 

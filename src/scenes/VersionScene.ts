@@ -12,7 +12,7 @@ import type { VersionData } from '../version/format';
 import { shareLink } from '../version/link';
 import { buildPrompt } from '../version/prompt';
 import { activeContent, setActiveVersion } from '../version/registry';
-import { activeVersionId, deleteVersion, listVersions, MAX_VERSIONS, saveVersion, setActiveVersionId } from '../version/store';
+import { activeVersionId, deleteVersion, listVersions, MAX_VERSIONS, sameNameVersion, saveVersion, setActiveVersionId } from '../version/store';
 import { summarize } from '../version/summary';
 import { checkVersion, parseVersionText, type CheckResult } from '../version/validate';
 
@@ -321,7 +321,8 @@ export class VersionScene extends Phaser.Scene {
     this.bottomRow([{ label: 'OK', variant: 'primary', onClick: () => this.back() }], 260);
   }
 
-  private showSummary(result: Extract<CheckResult, { ok: true }>, source: Source): void {
+  /** `saveNow` saves straight away once shown (after the player chose how to handle a name clash). */
+  private showSummary(result: Extract<CheckResult, { ok: true }>, source: Source, saveNow?: { replace?: string }): void {
     this.clear();
     const v = result.version;
     const accent = v.theme?.accent ?? '#73eff7';
@@ -337,12 +338,17 @@ export class VersionScene extends Phaser.Scene {
     }
     const msg = this.text(CX, 404, source === 'link' ? 'Shared versions are CC BY-SA 4.0: free to play, change and share.' : '', 8, '#a7f070', 700);
     const play = () => {
-      setActiveVersion(v);
-      if (listVersions().some((s) => s.id === versionHash(v))) setActiveVersionId(versionHash(v));
+      // A saved version becomes the player's choice; anything else is only being tried out.
+      const saved = listVersions().some((s) => s.id === versionHash(v));
+      if (!setActiveVersion(v, !saved)) {
+        msg.setText("The game couldn't build this version.").setColor('#ef7d57');
+        return;
+      }
+      if (saved) setActiveVersionId(versionHash(v));
       this.scene.start('Game', { difficulty: loadDifficulty(), map: loadMapMode() });
     };
-    const save = () => {
-      const r = saveVersion(v);
+    const save = (replace?: string) => {
+      const r = saveVersion(v, replace);
       if (r.ok) {
         setActiveVersionId(r.id);
         setActiveVersion(v);
@@ -350,6 +356,11 @@ export class VersionScene extends Phaser.Scene {
       } else {
         msg.setText(r.reason === 'full' ? `You already have ${MAX_VERSIONS}. Delete one first.` : "Couldn't save in this browser.").setColor('#ef7d57');
       }
+    };
+    const askSave = () => {
+      const other = sameNameVersion(v);
+      if (other) this.showReplace(v, other.id, (choice) => this.showSummary(result, source, choice), () => this.showSummary(result, source));
+      else save();
     };
     const share = () => {
       void shareLink(v).then(async (link) => {
@@ -367,10 +378,26 @@ export class VersionScene extends Phaser.Scene {
     };
     this.bottomRow([
       { label: 'PLAY', variant: 'primary', onClick: play },
-      { label: source === 'saved' ? 'SAVE AGAIN' : 'SAVE', variant: 'accent', onClick: save },
+      { label: source === 'saved' ? 'SAVE AGAIN' : 'SAVE', variant: 'accent', onClick: askSave },
       { label: 'SHARE LINK', variant: 'accent', onClick: share },
       { label: source === 'link' ? 'NO THANKS' : 'BACK', onClick: () => (source === 'link' ? this.back() : this.showList()) },
     ]);
+    if (saveNow) save(saveNow.replace);
+  }
+
+  /** Another saved version already has this name: replace it, or keep both. */
+  private showReplace(v: VersionData, otherId: string, choose: (c: { replace?: string }) => void, back: () => void): void {
+    this.clear();
+    this.text(CX, 120, 'SAME NAME!', 16, '#ffcd75');
+    this.text(CX, 160, `You already have a different version called ${v.name}.\nReplace it with this one, or keep both?`, 8, '#f4f4f4', 600);
+    this.bottomRow(
+      [
+        { label: 'REPLACE IT', variant: 'danger', onClick: () => choose({ replace: otherId }) },
+        { label: 'KEEP BOTH', variant: 'primary', onClick: () => choose({}) },
+        { label: 'CANCEL', onClick: back },
+      ],
+      230,
+    );
   }
 
   private showLink(link: string, result: Extract<CheckResult, { ok: true }>, source: Source): void {

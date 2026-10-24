@@ -5,6 +5,9 @@ interface QueuedSpawn {
   enemy: string;
 }
 
+/** Most enemies one wave may send, after every multiplier. */
+export const MAX_WAVE_SPAWNS = 250;
+
 /** Turns wave definitions into timed spawns. */
 export class WaveManager {
   /** 1-based number of the current (or last finished) wave; 0 before the first. */
@@ -38,9 +41,11 @@ export class WaveManager {
     const wave = this.waves[this.current];
     this.current++;
     this.elapsed = 0;
+    const wanted = wave.groups.reduce((n, g) => n + Math.max(1, Math.round(g.count * this.countMult)), 0);
+    const shrink = Math.min(1, MAX_WAVE_SPAWNS / wanted);
     this.queue = wave.groups
       .flatMap((g) => {
-        const count = Math.max(1, Math.round(g.count * this.countMult));
+        const count = Math.max(1, Math.floor(Math.max(1, Math.round(g.count * this.countMult)) * shrink));
         const interval = g.interval / this.countMult;
         return Array.from({ length: count }, (_, i) => ({ time: (g.delay ?? 0) + i * interval, enemy: g.enemy }));
       })

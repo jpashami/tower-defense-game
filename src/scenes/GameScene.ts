@@ -118,6 +118,8 @@ export class GameScene extends Phaser.Scene {
   private rangeGfx!: Phaser.GameObjects.Graphics;
   private cloudGfx!: Phaser.GameObjects.Graphics;
   private callout: Phaser.GameObjects.GameObject[] = [];
+  /** The last mouse press was already handled when it went down. */
+  private mouseActed = false;
 
   constructor() {
     super('Game');
@@ -207,7 +209,9 @@ export class GameScene extends Phaser.Scene {
 
     this.scene.launch('UI');
     const title = this.custom ? level.name : this.content.version ? this.content.name : '';
-    banner(this, MAP_W / 2, MAP_H / 2, title ? `${title}\n\nBUILD YOUR\nDEFENCES` : 'BUILD YOUR\nDEFENCES', '#ffcd75');
+    // The view starts fitted to the whole map, so its middle is the map's middle.
+    const middle = this.cols * TILE > MAP_W || this.rows * TILE > MAP_H ? { x: (this.cols * TILE) / 2, y: (this.rows * TILE) / 2 } : { x: MAP_W / 2, y: MAP_H / 2 };
+    banner(this, middle.x, middle.y, title ? `${title}\n\nBUILD YOUR\nDEFENCES` : 'BUILD YOUR\nDEFENCES', '#ffcd75');
 
     if (import.meta.env.DEV) (window as unknown as { gameScene: GameScene }).gameScene = this;
   }
@@ -555,6 +559,28 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Where a split or summoned enemy goes. Flyers head straight for the castle, boats keep to
+   * the river, and walkers follow the road; one that can't share its parent's route starts at
+   * the nearest point of its own.
+   */
+  private childRoute(parent: Enemy, child: EnemyDef): { route: Point[]; progress: number; sameRoute: boolean } {
+    const parentKind = parent.flying ? 'air' : parent.boat ? 'boat' : 'ground';
+    const childKind = child.flying ? 'air' : child.boat ? 'boat' : 'ground';
+    if (childKind === parentKind) return { route: parent.route, progress: parent.progress, sameRoute: true };
+    if (childKind === 'air') {
+      const castle = this.routes.ground[0][this.routes.ground[0].length - 1];
+      return { route: [{ x: parent.pos.x, y: parent.pos.y }, castle], progress: 0, sameRoute: false };
+    }
+    const options = childKind === 'boat' && this.routes.boat ? [this.routes.boat] : this.routes.ground;
+    let best = { route: options[0], progress: 0, d: Infinity };
+    for (const route of options) {
+      const near = nearestOnRoute(route, parent.pos);
+      if (near.d < best.d) best = { route, ...near };
+    }
+    return { route: best.route, progress: best.progress, sameRoute: false };
+  }
+
   /** Boats with no river to sail walk the road instead. */
   private asWalker(def: EnemyDef): EnemyDef {
     return def.boat && !this.routes.boat ? { ...def, boat: false } : def;
@@ -722,9 +748,12 @@ export class GameScene extends Phaser.Scene {
       case 'spawn': {
         const def = this.content.enemies[action.enemy];
         if (!def || e.generation >= MAX_GENERATION) return;
+        const kind = this.asWalker(def);
+        const { route, progress, sameRoute } = this.childRoute(e, kind);
         for (let k = 0; k < action.count && this.enemies.length < MAX_ENEMIES; k++) {
-          const child = new Enemy(this, this.asWalker({ ...def, flying: def.flying, boat: def.boat && e.boat }), e.route, e.hpMultiplier, e.speedMultiplier, {
-            progress: Math.max(0, e.progress - 6 - k * 8),
+          const child = new Enemy(this, kind, route, e.hpMultiplier, e.speedMultiplier, {
+            // Children on the parent's own route spread out behind it; others start where it is.
+            progress: sameRoute ? Math.max(0, progress - 6 - k * 8) : progress,
             generation: e.generation + 1,
             ground: this.groundAt,
           });
@@ -919,7 +948,7 @@ export class GameScene extends Phaser.Scene {
     const victims =
       stats.splash > 0
         ? this.enemies.filter(
-            (e) => e.targetable && !e.flying && Math.hypot(e.pos.x - p.tx, e.pos.y - p.ty) <= stats.splash,
+            (e) => e.targetable && (!e.flying || e === p.target) && Math.hypot(e.pos.x - p.tx, e.pos.y - p.ty) <= stats.splash,
           )
         : p.target.targetable
           ? [p.target]
@@ -1061,14 +1090,16 @@ export class GameScene extends Phaser.Scene {
       this.mapCam.jumpFromMinimap(p.x, p.y);
       return;
     }
-    // Fingers act when lifted, so a drag or pinch never builds by accident. The mouse acts at once.
+    // Fingers act when lifted, so a drag or pinch never builds by accident. The mouse acts at once,
+    // unless the map can be dragged around; then it waits too, to tell a click from a drag.
     this.mapCam.down(p);
-    if (!p.wasTouch) this.handleTap(p);
+    this.mouseActed = !p.wasTouch && (p.rightButtonDown() || !this.mapCam.pannable);
+    if (this.mouseActed) this.handleTap(p);
   }
 
   private onPointerUp(p: Phaser.Input.Pointer): void {
     const tap = this.mapCam.up(p);
-    if (!p.wasTouch) return;
+    if (!p.wasTouch && this.mouseActed) return;
     if (tap && p.x < MAP_W && !this.mapCam.onMinimap(p.x, p.y)) this.handleTap(p);
   }
 
@@ -1219,4 +1250,20 @@ export class GameScene extends Phaser.Scene {
       g.fillStyle(t.broken ? 0x566c86 : 0xef7d57, 1).fillRect(x, y, Math.ceil((24 * t.hp) / t.maxHp), 3);
     }
   }
+}
+
+/** The point of a route nearest to a position: how far along the route it is, and how far away. */
+function nearestOnRoute(route: Point[], at: Point): { progress: number; d: number } {
+  let best = { progress: 0, d: Infinity };
+  let walked = 0;
+  for (let i = 1; i < route.length; i++) {
+    const a = route[i - 1];
+    const b = route[i];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    const t = len ? Math.max(0, Math.min(1, ((at.x - a.x) * (b.x - a.x) + (at.y - a.y) * (b.y - a.y)) / (len * len))) : 0;
+    const d = Math.hypot(a.x + (b.x - a.x) * t - at.x, a.y + (b.y - a.y) * t - at.y);
+    if (d < best.d) best = { progress: walked + len * t, d };
+    walked += len;
+  }
+  return best;
 }

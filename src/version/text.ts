@@ -32,11 +32,15 @@ export function cleanText(raw: unknown, maxLength: number, upper = false): strin
   return s.slice(0, maxLength).trim();
 }
 
-/** An id such as "ghost" or "fire_tower": lower case letters, digits and underscores, starting with a letter. */
+/**
+ * An id such as "ghost" or "fire_tower": lower case letters, digits and underscores, starting with a letter.
+ * Names every JavaScript object already has (constructor, valueOf...) are refused, so an id can
+ * never look up something built in.
+ */
 export function cleanId(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;
   const s = raw.trim().toLowerCase().replace(/[\s-]+/g, '_');
-  return /^[a-z][a-z0-9_]{0,15}$/.test(s) ? s : null;
+  return /^[a-z][a-z0-9_]{0,15}$/.test(s) && !(s in Object.prototype) ? s : null;
 }
 
 /** A "#rrggbb" colour as a number, or null. */

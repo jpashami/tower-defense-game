@@ -15,8 +15,7 @@ import { initPlayers } from './profile/players';
 import { isTouchDevice } from './ui/touch';
 import { view, widthFor } from './ui/layout';
 import { readVersionFromAddress } from './version/incoming';
-import { setActiveVersion } from './version/registry';
-import { loadActiveVersion } from './version/store';
+import { useSavedVersion } from './version/registry';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -45,7 +44,7 @@ async function start(): Promise<void> {
   }
   // Players and their chosen version, before any scene reads them.
   initPlayers();
-  setActiveVersion(loadActiveVersion()?.data ?? null);
+  useSavedVersion();
   // A shared version in the address (#v=...) is offered on the title screen.
   void readVersionFromAddress();
   window.addEventListener('hashchange', () => void readVersionFromAddress());

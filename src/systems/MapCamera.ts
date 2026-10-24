@@ -48,9 +48,9 @@ export class MapCamera {
     return this.cam.zoom > this.minZoom + 0.01;
   }
 
-  /** Whether a screen point is on the minimap. */
+  /** Whether a screen point is on the minimap (only shown while zoomed in; zoomed out, the whole map is in view). */
   onMinimap(x: number, y: number): boolean {
-    return this.mini !== null && this.miniRect.contains(x, y);
+    return this.mini !== null && this.mini.visible && this.miniRect.contains(x, y);
   }
 
   /** Centres the view on the map point under a minimap tap. */
@@ -64,7 +64,8 @@ export class MapCamera {
 
   /** Keeps the minimap's view box in step with the camera; call every frame. */
   update(): void {
-    if (!this.miniFrame) return;
+    if (!this.miniFrame || !this.mini) return;
+    this.mini.setVisible(this.zoomed);
     const v = this.cam.worldView;
     this.miniFrame.clear().lineStyle(this.miniLine, 0xf4f4f4, 1).strokeRect(v.x, v.y, v.width, v.height);
   }
@@ -115,6 +116,11 @@ export class MapCamera {
     this.gestured.delete(p.id);
     if (this.activeFingers().length < 2) this.pinch = null;
     return wasTap;
+  }
+
+  /** There is more map than fits on screen right now, so dragging moves the view. */
+  get pannable(): boolean {
+    return this.canPan();
   }
 
   /** There is more map than fits on screen. */
