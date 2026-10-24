@@ -136,6 +136,8 @@ export class MenuScene extends Phaser.Scene {
       '#566c86',
     ).setLineSpacing(8);
 
+    new Button(this, { x: cx - 100, y: 438, w: 200, h: 26, label: 'SUGGEST A FEATURE', depth: 21, onClick: () => this.scene.start('Suggest') });
+
     const kb = this.input.keyboard;
     kb?.once('keydown-ENTER', () => this.startGame());
     kb?.once('keydown-SPACE', () => this.startGame());

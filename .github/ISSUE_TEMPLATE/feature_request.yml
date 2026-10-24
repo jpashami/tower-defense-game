@@ -1,0 +1,57 @@
+name: Feature request
+description: Ask for something new in the game that needs a real change to its code.
+title: "[Idea] "
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping make Pixel Tower Defence better!
+
+        **Before you post:** new enemies, towers, traps, maps and waves can usually be made right away with **MY VERSION** on the title screen, with no code change and no waiting. This form is for things a version can't do yet, such as a new kind of ability, a new game mode or a new screen.
+
+        **Under 13?** Ask a parent or carer to post this for you from their own GitHub account.
+
+        Tip: in the game, press **SUGGEST A FEATURE** on the title screen. It copies a message for your own Claude chat that turns a rough idea into answers for every box below.
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea in plain words
+      description: What should the game have or do? No technical words needed.
+      placeholder: "Enemies that dig under the road and pop up further along, so you have to guard the end of the path too."
+    validations:
+      required: true
+  - type: textarea
+    id: who
+    attributes:
+      label: Who is it for?
+      description: Who would enjoy this, and why? For example "my 8-year-old, who finds Easy too easy" or "anyone who likes big boss fights".
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Example of how it would play
+      description: Walk through a moment in a game with this feature. What do you see, tap or decide?
+      placeholder: "On wave 6 a mole pops out of the ground halfway along the path. My frost tower near the castle slows it so the cannon can finish it."
+    validations:
+      required: true
+  - type: textarea
+    id: prompt
+    attributes:
+      label: Build-ready prompt (optional)
+      description: |
+        A clear request a builder can hand straight to Claude Code. Ask your own Claude to write it (CONTRIBUTING.md shows how), then paste it here.
+        Leave it empty if you like; someone may add one later.
+      render: markdown
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: This idea is friendly for children of all ages (no gore, scary real-world violence, rude words or personal details).
+          required: true
+        - label: I looked through the open ideas and this isn't already there. (If it is, add a 👍 to that one instead.)
+          required: false

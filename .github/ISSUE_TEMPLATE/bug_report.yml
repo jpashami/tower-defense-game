@@ -1,0 +1,53 @@
+name: Bug report
+description: Something in the game is broken or doesn't work as it should.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Sorry something went wrong! A few details help us find it. **Under 13?** Ask a parent or carer to post this for you.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you see, and what did you expect to see instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can we make it happen again?
+      description: The steps that lead to the problem, as best you remember.
+      placeholder: |
+        1. Pick Hard and the classic map
+        2. Build a frost tower next to the castle
+        3. On wave 5 the boss walks through the tower
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where were you playing?
+      options:
+        - The website in a browser on a computer
+        - The website in a phone or tablet browser
+        - Installed from the website to the home screen
+        - The Android app (APK)
+        - A family copy of the game (please give its link below)
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and browser
+      placeholder: "Samsung tablet, Chrome"
+    validations:
+      required: false
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: A screenshot, the map number, or a version's share link if you were playing one. Please leave out names and other personal details.
+    validations:
+      required: false

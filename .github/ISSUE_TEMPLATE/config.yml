@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Chat, questions and showing off your versions
+    url: https://github.com/jpashami/tower-defense-game/discussions
+    about: Ask a question, share a version link, or talk about an idea before asking for it.
+  - name: Make a new enemy, tower or map yourself (no code needed)
+    url: https://jpashami.github.io/tower-defense-game/
+    about: Open the game, press MY VERSION, and make it with your own Claude chat in a few minutes.

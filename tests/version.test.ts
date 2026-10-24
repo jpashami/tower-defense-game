@@ -417,6 +417,29 @@ describe('players', () => {
     assert.ok(![...store.keys()].some((k) => k.startsWith(`pixel-td:${sam.id}:`)));
   });
 
+  test('each copy of the game on a github.io site keeps its own saves', () => {
+    assert.equal(players.saveSpaceFor('jpashami.github.io', '/tower-defense-game/'), '');
+    assert.equal(players.saveSpaceFor('localhost', '/my-td/'), '');
+    assert.equal(players.saveSpaceFor('sam.github.io', '/index.html'), '');
+    assert.equal(players.saveSpaceFor('sam.github.io', '/My-TD/index.html'), 'pixel-td@my-td/');
+
+    store.set('pixel-td-players', '[{"id":"p1","name":"ANA","color":"#41a6f6"}]');
+    store.set('pixel-td:p1:difficulty', 'hard');
+    try {
+      players.useSaveSpace('pixel-td@my-td/');
+      assert.equal(players.initPlayers().name, 'ANA');
+      assert.equal(players.playerGet('difficulty'), 'hard');
+      players.playerSet('difficulty', 'easy');
+      assert.equal(store.get('pixel-td:p1:difficulty'), 'hard');
+      // Copied once only: later changes to the plain saves don't come in again.
+      store.set('pixel-td:p1:map', 'classic');
+      players.useSaveSpace('pixel-td@my-td/');
+      assert.equal(players.playerGet('map'), null);
+    } finally {
+      players.useSaveSpace('');
+    }
+  });
+
   test('saved versions are checked again when loaded', () => {
     players.initPlayers();
     players.playerSet('versions', JSON.stringify([{ data: { name: '<x>', enemies: [{ id: 'a', hp: 1e9 }] } }, { data: 'junk' }]));
