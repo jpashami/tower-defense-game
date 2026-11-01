@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { DEPTH, SELL_REFUND, TILE } from '../config/constants';
 import type { TrapDef } from '../config/traps';
+import { SQUASH, project } from '../config/view';
 import type { Enemy } from './Enemy';
 
 /** A trap on a road square. The game decides when walkers set it off. */
@@ -28,14 +29,21 @@ export class Trap {
     this.y = row * TILE + TILE / 2;
     this.usesLeft = def.uses;
     this.spent = def.cost;
-    this.image = scene.add.image(this.x, this.y, def.texture).setDepth(DEPTH.deco + 0.2);
+    // Traps lie flat on the road, so they are drawn squashed to the ground's slant.
+    const p = project(this.x, this.y);
+    this.image = scene.add.image(p.x, p.y, def.texture).setDepth(DEPTH.flat + 0.2);
     if (def.tint !== undefined) this.image.setTint(def.tint);
-    this.image.setScale(0.4);
-    scene.tweens.add({ targets: this.image, scale: 1, duration: 180, ease: 'Back.easeOut' });
+    this.image.setScale(0.4, 0.4 * SQUASH);
+    scene.tweens.add({ targets: this.image, scaleX: 1, scaleY: SQUASH, duration: 180, ease: 'Back.easeOut' });
   }
 
   get sellValue(): number {
     return Math.floor(this.spent * SELL_REFUND);
+  }
+
+  /** Where the trap is drawn, for messages. */
+  get screen(): { x: number; y: number } {
+    return { x: this.image.x, y: this.image.y };
   }
 
   /** Whether an enemy standing at this point is on the trap. */

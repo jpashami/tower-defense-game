@@ -2,17 +2,24 @@ import Phaser from 'phaser';
 import { DEPTH } from '../config/constants';
 import type { EnemyDef } from '../config/enemies';
 import { SURFACE, type Point, type TileType } from '../config/map';
+import { SQUASH, depthAt, liftOf, project } from '../config/view';
 
 export interface EnemyOptions {
   /** Start this far along the route (split and summoned enemies appear where their parent is). */
   progress?: number;
   /** How many splits or summons deep this enemy is, so splitting can't go on forever. */
   generation?: number;
-  /** The ground under a point, for sand, ice and lava. Walkers only. */
+  /** The ground under a point: sand, ice and lava slow or burn walkers, and it sets how high everything is drawn. */
   ground?: (x: number, y: number) => TileType | undefined;
 }
 
-/** A walker, flyer or boat that follows its route until it dies or reaches the castle. */
+/** Empty pixels under an enemy's feet in its picture. */
+const FOOT = 3;
+
+/**
+ * A walker, flyer or boat that follows its route until it dies or reaches the castle.
+ * It moves on the flat map (`pos`); the picture stands upright at that point in the angled view.
+ */
 export class Enemy extends Phaser.GameObjects.Image {
   readonly def: EnemyDef;
   readonly maxHp: number;
@@ -63,6 +70,8 @@ export class Enemy extends Phaser.GameObjects.Image {
   private burnTick = 0;
   private walkFrame = -1;
   private flapTime = Math.random();
+  /** How high the feet are above the ground right now (a bob, or a flyer's height). */
+  private bob = 0;
 
   constructor(scene: Phaser.Scene, def: EnemyDef, path: Point[], hpMultiplier: number, speedMultiplier = 1, opts: EnemyOptions = {}) {
     super(scene, path[0].x, path[0].y, `${def.texture}_0`);
@@ -84,17 +93,19 @@ export class Enemy extends Phaser.GameObjects.Image {
     const abilities = def.abilities ?? [];
     this.abilityTimers = abilities.map((a) => (a.when.kind === 'every' ? a.when.seconds : 0));
     this.abilityFired = abilities.map(() => false);
-    if (!def.flying && !def.boat) this.ground = opts.ground;
+    this.ground = opts.ground;
     const scale = def.scale ?? 1;
     this.setScale(scale);
+    this.setOrigin(0.5, 1);
     this.shadow = scene.add
       .image(this.pos.x, this.pos.y, 'shadow')
-      .setDepth(DEPTH.deco + 0.5)
-      .setScale(scale * (def.flying ? 0.8 : 1))
+      .setDepth(DEPTH.flat + 0.5)
+      .setScale(scale * (def.flying ? 0.8 : 1), scale * SQUASH)
       .setAlpha(def.flying ? 0.6 : 1)
       .setVisible(!def.boat);
     scene.add.existing(this);
     if (opts.progress) this.moveTo(Math.min(opts.progress, this.routeLength - 1));
+    this.place();
   }
 
   get flying(): boolean {
@@ -137,9 +148,20 @@ export class Enemy extends Phaser.GameObjects.Image {
     return this.targetable && !this.hidden;
   }
 
-  /** Where shots should aim: the body, which for flyers is well above the ground. */
-  get aimY(): number {
-    return this.pos.y - (this.flying ? 14 : 2) * (this.def.scale ?? 1);
+  /** How high this enemy's ground stands (see view.ts): walkers are on the road, boats on water. */
+  get lift(): number {
+    const t = this.ground?.(this.pos.x, this.pos.y);
+    return liftOf(t ?? (this.boat ? 'water' : 'path'));
+  }
+
+  /** Height of the body's middle above the ground, where shots aim and health bars hang. */
+  get bodyZ(): number {
+    return this.bob + this.displayHeight / 2 - FOOT * this.scaleX;
+  }
+
+  /** Where the body's middle is drawn, for effects and messages. */
+  get screen(): Point {
+    return project(this.pos.x, this.pos.y, this.bodyZ, this.lift);
   }
 
   /** Pixels left to the castle; towers aiming at "first" pick the smallest. */
@@ -182,31 +204,26 @@ export class Enemy extends Phaser.GameObjects.Image {
     if (this.progress >= this.routeLength) this.escaped = true;
 
     let frame: number;
-    let lift: number;
     if (this.flying) {
       // Flyers flap on a timer and hover well above their shadow.
       this.flapTime += dt * freeze;
       frame = Math.floor(this.flapTime * 5) % 2;
-      lift = 14 + Math.sin(this.flapTime * 4) * 2;
-      this.setDepth(DEPTH.flying + this.pos.y / 1000);
+      this.bob = (14 + Math.sin(this.flapTime * 4) * 2) * this.scaleX;
     } else if (this.boat) {
       // Boats rock gently on the water.
       this.flapTime += dt;
       frame = Math.floor(this.progress / 12) % 2;
-      lift = 2 + Math.sin(this.flapTime * 3) * 1;
-      this.setDepth(DEPTH.enemy + this.pos.y / 1000);
+      this.bob = (1 + Math.sin(this.flapTime * 3) * 1) * this.scaleX;
     } else {
       // Walkers step with distance travelled, plus a 1px bob.
       frame = Math.floor(this.progress / 9) % 2;
-      lift = 2 + frame;
-      this.setDepth(DEPTH.enemy + this.pos.y / 1000);
+      this.bob = frame * this.scaleX;
     }
     if (frame !== this.walkFrame) {
       this.walkFrame = frame;
       this.setTexture(`${this.def.texture}_${frame}`);
     }
-    this.setPosition(this.pos.x, this.pos.y - lift * (this.def.scale ?? 1));
-    this.shadow.setPosition(this.pos.x, this.pos.y + 13);
+    this.place();
 
     // Hidden enemies show as a faint shimmer so players know something is there.
     const hidden = this.hidden;
@@ -293,6 +310,16 @@ export class Enemy extends Phaser.GameObjects.Image {
   destroy(fromScene?: boolean): void {
     this.shadow?.destroy();
     super.destroy(fromScene);
+  }
+
+  /** Draws the enemy standing at its map point, and its shadow on the ground under it. */
+  private place(): void {
+    const lift = this.lift;
+    const feet = project(this.pos.x, this.pos.y, this.bob, lift);
+    this.setPosition(feet.x, feet.y + FOOT * this.scaleX);
+    const ground = project(this.pos.x, this.pos.y, 0, lift);
+    this.shadow.setPosition(ground.x, ground.y);
+    this.setDepth(depthAt(this.flying ? DEPTH.flying : DEPTH.standing, this.pos.y));
   }
 
   /** Puts the enemy at a distance along its route and faces it the way it walks. */

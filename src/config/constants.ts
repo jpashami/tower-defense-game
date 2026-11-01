@@ -18,15 +18,12 @@ export const BETWEEN_WAVES = 12;
 
 export const FONT = '"Press Start 2P", monospace';
 
-/** Draw order, lowest first. */
+/** Draw order, lowest first. Things on the ground add their map y (see view.ts depthAt). */
 export const DEPTH = {
-  ground: 0,
-  pathEdge: 1,
-  deco: 2,
-  towerBase: 3,
-  enemy: 4, // plus y/1000 so lower enemies draw in front
-  towerHead: 5,
-  flying: 5.5, // plus y/1000
+  ground: 0, // plus the row, so lower rows draw over the ones behind
+  flat: 2, // on the ground: shadows, traps, portals, flowers, clouds, rings
+  standing: 4, // plus y/10000: enemies, towers, trees, the castle
+  flying: 5.5, // plus y/10000
   projectile: 6,
   effect: 7,
   bars: 8,

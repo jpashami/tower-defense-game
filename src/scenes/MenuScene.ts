@@ -1,14 +1,14 @@
 import Phaser from 'phaser';
-import { DEPTH, FONT, GAME_W, MAP_H, MAP_W } from '../config/constants';
+import { FONT, GAME_W, MAP_H, MAP_W } from '../config/constants';
 import { DIFFICULTY_ORDER, loadDifficulty, saveDifficulty, type DifficultyKey } from '../config/difficulty';
 import type { LevelDef } from '../config/level';
-import { buildGrid, pathPoints, tileCenter } from '../config/map';
+import { buildGrid, pathPoints } from '../config/map';
 import { loadMapMode, loadShortcutEnabled, saveMapMode, saveShortcutEnabled, type MapMode } from '../config/settings';
 import { SHORTCUT } from '../config/shortcut';
 import { Enemy } from '../entities/Enemy';
 import { currentPlayer } from '../profile/players';
 import { randomSeed } from '../systems/MapGenerator';
-import { renderMap } from '../systems/MapRenderer';
+import { renderMap, standing } from '../systems/MapRenderer';
 import { Button } from '../ui/Button';
 import { centreScene, fullScreenRect } from '../ui/layout';
 import { isTouchDevice } from '../ui/touch';
@@ -228,8 +228,7 @@ export class MenuScene extends Phaser.Scene {
     this.mapObjects = renderMap(this, grid, level.path, level.decorations, { extraPaths: level.extraPaths, boatRoute: level.boatRoute });
     if (sc) {
       for (const [c, r] of [sc.tiles[0], sc.tiles[sc.tiles.length - 1]]) {
-        const { x, y } = tileCenter(c, r);
-        this.mapObjects.push(this.add.image(x, y, 'gate').setDepth(DEPTH.towerBase));
+        this.mapObjects.push(standing(this, 'gate', c, r, 0, 2));
       }
     }
   }

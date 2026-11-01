@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
-import { DEPTH, FONT, GAME_H, GAME_W, MAP_H, MAP_W, PANEL_W, ROWS, TILE } from '../config/constants';
+import { COLS, DEPTH, FONT, GAME_H, GAME_W, MAP_H, MAP_W, PANEL_W, ROWS, TILE } from '../config/constants';
+import { TILE_H, groundTop, liftOf, unprojectY } from '../config/view';
 import { ENEMIES, type CreatorEnemyKey } from '../config/enemies';
 import { defaultTuning } from '../config/level';
-import { buildGrid, type DecorationKind } from '../config/map';
+import { buildGrid, type DecorationKind, type TileType } from '../config/map';
 import { CREATOR_TOWERS as TOWER_ORDER, TOWERS } from '../config/towers';
 import {
   blankLevel,
@@ -58,6 +59,8 @@ export class EditorScene extends Phaser.Scene {
   private level!: CustomLevel;
   private tool: Tool = 'path';
   private mapObjects: Phaser.GameObjects.GameObject[] = [];
+  /** The squares as last drawn, for the angled view's heights. */
+  private grid: TileType[][] = [];
   private marks!: Phaser.GameObjects.Graphics;
   private hover: Cell | null = null;
   private dragMode: 'add' | 'remove' | null = null;
@@ -140,11 +143,11 @@ export class EditorScene extends Phaser.Scene {
       // Pulse the squares the path may grow into next.
       g.lineStyle(2, 0xffcd75, 0.55 + 0.35 * Math.sin(time / 180));
       for (const { col, row } of this.nextPathCells()) {
-        g.strokeRect(col * TILE + 3, row * TILE + 3, TILE - 6, TILE - 6);
+        g.strokeRect(col * TILE + 3, this.cellTop(col, row) + 3, TILE - 6, TILE_H - 6);
       }
     }
     if (this.hover) {
-      g.lineStyle(2, 0xf4f4f4, 0.9).strokeRect(this.hover.col * TILE + 1, this.hover.row * TILE + 1, TILE - 2, TILE - 2);
+      g.lineStyle(2, 0xf4f4f4, 0.9).strokeRect(this.hover.col * TILE + 1, this.cellTop(this.hover.col, this.hover.row) + 1, TILE - 2, TILE_H - 2);
     }
   }
 
@@ -303,14 +306,26 @@ export class EditorScene extends Phaser.Scene {
     }
     const corners = pathCorners(this.level.path);
     const terrain = (this.level.water ?? []).map(([col, row]) => ({ col, row, kind: 'water' as const }));
-    this.mapObjects = renderMap(this, buildGrid(corners, this.level.decorations, { terrain }), corners, this.level.decorations);
+    this.grid = buildGrid(corners, this.level.decorations, { terrain });
+    this.mapObjects = renderMap(this, this.grid, corners, this.level.decorations);
+  }
+
+  /** Where the top of a square is drawn in the angled view (raised grass sits a little higher). */
+  private cellTop(col: number, row: number): number {
+    return groundTop(row) - liftOf(this.grid[row]?.[col]);
   }
 
   private cellAt(p: Phaser.Input.Pointer): Cell | null {
     // World coordinates: on wide screens the camera is shifted to centre the Creator.
-    const { worldX: x, worldY: y } = p;
-    if (x < 0 || x >= MAP_W || y < 0 || y >= MAP_H) return null;
-    return { col: Math.floor(x / TILE), row: Math.floor(y / TILE) };
+    const { worldX: x, worldY: sy } = p;
+    if (x < 0 || x >= MAP_W || sy < 0 || sy >= MAP_H) return null;
+    // Undo the angled view; raised ground is drawn a little higher, so look twice.
+    const col = Math.floor(x / TILE);
+    let row = Math.floor(unprojectY(sy) / TILE);
+    const lift = liftOf(this.grid[row]?.[col]);
+    if (lift) row = Math.floor(unprojectY(sy + lift) / TILE);
+    if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return null;
+    return { col, row };
   }
 
   private pathIndex(col: number, row: number): number {

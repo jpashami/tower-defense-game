@@ -1,5 +1,8 @@
 import Phaser from 'phaser';
 import { DEPTH, FONT } from '../config/constants';
+import { SQUASH } from '../config/view';
+
+/** Effects take drawn (screen) positions; the game projects map points before calling them. */
 
 /** Visual effects can be switched off for headless test runs (see src/dev/autoplay.ts). */
 export const fx = { enabled: true };
@@ -33,12 +36,12 @@ export function burst(scene: Phaser.Scene, x: number, y: number, color: number, 
   }
 }
 
-/** An expanding ring, for splash and frost hits. */
+/** An expanding ring on the ground (squashed to the view's slant), for splash and frost hits. */
 export function ring(scene: Phaser.Scene, x: number, y: number, radius: number, color: number): void {
   if (!fx.enabled) return;
   const g = scene.add.graphics({ x, y }).setDepth(DEPTH.effect);
   g.lineStyle(2, color, 1);
-  g.strokeCircle(0, 0, radius);
+  g.strokeEllipse(0, 0, radius * 2, radius * 2 * SQUASH);
   g.setScale(0.2);
   scene.tweens.add({ targets: g, scale: 1, alpha: 0, duration: 280, ease: 'Quad.easeOut', onComplete: () => g.destroy() });
 }
@@ -103,7 +106,7 @@ export function meteorFall(scene: Phaser.Scene, x: number, y: number, radius: nu
   if (!fx.enabled) return;
   const m = scene.add.image(x - 120, y - 160, 'meteor').setDepth(DEPTH.banner).setScale(1.5);
   const mark = scene.add.graphics().setDepth(DEPTH.range);
-  mark.lineStyle(2, 0xef7d57, 0.8).strokeCircle(x, y, radius);
+  mark.lineStyle(2, 0xef7d57, 0.8).strokeEllipse(x, y, radius * 2, radius * 2 * SQUASH);
   scene.tweens.add({
     targets: m,
     x,
