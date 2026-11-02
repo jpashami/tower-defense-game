@@ -10,6 +10,7 @@ import { FREEZE, METEOR, SPELLS, type SpellKey } from '../config/spells';
 import type { TowerDef } from '../config/towers';
 import type { TrapDef } from '../config/traps';
 import { waveClearBonus, waveSummary } from '../config/waves';
+import { SQUASH, TILE_H, groundTop, liftOf, project, unprojectY, viewHeight } from '../config/view';
 import { toLevelDef, type CustomLevel } from '../editor/customLevel';
 import { Enemy } from '../entities/Enemy';
 import { Projectile } from '../entities/Projectile';
@@ -19,7 +20,7 @@ import { Economy } from '../systems/Economy';
 import { banner, burst, floatText, fx, healSparkle, lightningBolt, meteorFall, meteorImpact, puff, ring, strike } from '../systems/Effects';
 import { MapCamera } from '../systems/MapCamera';
 import { randomSeed, type ShortcutDef } from '../systems/MapGenerator';
-import { renderMap } from '../systems/MapRenderer';
+import { renderMap, standing } from '../systems/MapRenderer';
 import { PlacementController } from '../systems/PlacementController';
 import { WaveManager } from '../systems/WaveManager';
 import { isTouchDevice } from '../ui/touch';
@@ -181,13 +182,14 @@ export class GameScene extends Phaser.Scene {
 
     this.economy = new Economy(level.startMoney ?? this.difficulty.startMoney, level.startLives ?? this.difficulty.startLives);
     this.waves = new WaveManager(level.waves, this.difficulty.countMult);
-    this.cloudGfx = this.add.graphics().setDepth(DEPTH.deco + 0.3);
+    this.cloudGfx = this.add.graphics().setDepth(DEPTH.flat + 0.3);
     this.bars = this.add.graphics().setDepth(DEPTH.bars);
-    this.rangeGfx = this.add.graphics().setDepth(DEPTH.range);
+    // Ranges and the chosen square are drawn on the ground, under whatever stands on it.
+    this.rangeGfx = this.add.graphics().setDepth(DEPTH.flat + 0.9);
     this.placement = new PlacementController(this);
 
     this.input.mouse?.disableContextMenu();
-    this.mapCam = new MapCamera(this, this.cols * TILE, this.rows * TILE);
+    this.mapCam = new MapCamera(this, this.cols * TILE, viewHeight(this.rows));
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => this.onPointerMove(p));
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.onPointerDown(p));
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => this.onPointerUp(p));
@@ -210,7 +212,8 @@ export class GameScene extends Phaser.Scene {
     this.scene.launch('UI');
     const title = this.custom ? level.name : this.content.version ? this.content.name : '';
     // The view starts fitted to the whole map, so its middle is the map's middle.
-    const middle = this.cols * TILE > MAP_W || this.rows * TILE > MAP_H ? { x: (this.cols * TILE) / 2, y: (this.rows * TILE) / 2 } : { x: MAP_W / 2, y: MAP_H / 2 };
+    const middle =
+      this.cols * TILE > MAP_W || viewHeight(this.rows) > MAP_H ? { x: (this.cols * TILE) / 2, y: viewHeight(this.rows) / 2 } : { x: MAP_W / 2, y: MAP_H / 2 };
     banner(this, middle.x, middle.y, title ? `${title}\n\nBUILD YOUR\nDEFENCES` : 'BUILD YOUR\nDEFENCES', '#ffcd75');
 
     if (import.meta.env.DEV) (window as unknown as { gameScene: GameScene }).gameScene = this;
@@ -299,8 +302,8 @@ export class GameScene extends Phaser.Scene {
     const cost = t.upgradeCost;
     if (cost === null || !this.economy.spend(cost)) return;
     t.upgrade();
-    burst(this, t.x, t.y, 0xffcd75, 10, 20);
-    floatText(this, t.x, t.y - 16, 'UPGRADE!', '#a7f070');
+    burst(this, t.top.x, t.top.y, 0xffcd75, 10, 20);
+    floatText(this, t.top.x, t.top.y - 16, 'UPGRADE!', '#a7f070');
   }
 
   sellSelected(): void {
@@ -308,7 +311,7 @@ export class GameScene extends Phaser.Scene {
     const trap = this.selectedTrap;
     if (trap) {
       this.economy.earn(trap.sellValue);
-      floatText(this, trap.x, trap.y - 8, `+${trap.sellValue}`);
+      floatText(this, trap.screen.x, trap.screen.y - 8, `+${trap.sellValue}`);
       this.removeTrap(trap);
       return;
     }
@@ -318,9 +321,10 @@ export class GameScene extends Phaser.Scene {
     this.economy.earn(value);
     this.towerAt.delete(this.cellKey(t.col, t.row));
     this.towers = this.towers.filter((x) => x !== t);
+    const at = t.top;
     t.destroy();
-    burst(this, t.x, t.y, 0xc69060, 12, 18);
-    floatText(this, t.x, t.y - 8, `+${value}`);
+    burst(this, at.x, at.y, 0xc69060, 12, 18);
+    floatText(this, at.x, at.y - 8, `+${value}`);
     this.selected = null;
   }
 
@@ -330,14 +334,14 @@ export class GameScene extends Phaser.Scene {
     const t = this.selected;
     if (t?.broken && this.economy.spend(t.repairCost)) {
       t.repair();
-      burst(this, t.x, t.y, 0xa7f070, 10, 18);
-      floatText(this, t.x, t.y - 16, 'FIXED!', '#a7f070');
+      burst(this, t.top.x, t.top.y, 0xa7f070, 10, 18);
+      floatText(this, t.top.x, t.top.y - 16, 'FIXED!', '#a7f070');
     }
     const trap = this.selectedTrap;
     if (trap && trap.def.kind === 'bomb' && !trap.armed && this.economy.spend(trap.def.rearm)) {
       trap.setArmed(true);
       trap.spent += trap.def.rearm;
-      floatText(this, trap.x, trap.y - 12, 'READY!', '#a7f070');
+      floatText(this, trap.screen.x, trap.screen.y - 12, 'READY!', '#a7f070');
     }
   }
 
@@ -374,7 +378,8 @@ export class GameScene extends Phaser.Scene {
     this.aimingMeteor = false;
     this.spellCooldown.meteor = SPELLS.meteor.cooldown;
     this.pendingMeteors.push({ x, y, t: METEOR.fallTime, damage: METEOR.damage(Math.max(1, this.waves.current)) });
-    meteorFall(this, x, y, METEOR.radius, METEOR.fallTime / this.speed);
+    const at = this.screenAt(x, y);
+    meteorFall(this, at.x, at.y, METEOR.radius, METEOR.fallTime / this.speed);
   }
 
   toggleSpeed(): void {
@@ -519,27 +524,40 @@ export class GameScene extends Phaser.Scene {
   private placeGates(): void {
     if (!this.shortcut) return;
     const ends = [this.shortcut.tiles[0], this.shortcut.tiles[this.shortcut.tiles.length - 1]];
-    for (const [c, r] of ends) {
-      const { x, y } = tileCenter(c, r);
-      this.gates.push(this.add.image(x, y, 'gate').setDepth(DEPTH.towerBase));
-    }
+    for (const [c, r] of ends) this.gates.push(standing(this, 'gate', c, r, liftOf(this.grid[r]?.[c]), 2));
   }
 
   private openShortcut(): void {
     this.shortcutOpen = true;
     for (const g of this.gates) {
-      burst(this, g.x, g.y, 0xc69060, 14, 22);
+      burst(this, g.x, g.y - 10, 0xc69060, 14, 22);
       g.destroy();
     }
     this.gates = [];
     const mid = this.shortcut!.tiles[Math.floor(this.shortcut!.tiles.length / 2)];
-    const { x, y } = tileCenter(mid[0], mid[1]);
+    const { x, y } = this.cellScreen(mid[0], mid[1]);
     floatText(this, x, y - 12, 'SHORTCUT OPEN!', '#ef7d57');
   }
 
   /** The ground under a map point, for sand, ice and lava. */
   private groundAt = (x: number, y: number): TileType | undefined =>
     this.grid[Math.floor(y / TILE)]?.[Math.floor(x / TILE)];
+
+  /** Where a map point is drawn in the angled view (see view.ts), allowing for raised or sunken ground. */
+  private screenAt(x: number, y: number, z = 0): Point {
+    return project(x, y, z, liftOf(this.groundAt(x, y)));
+  }
+
+  /** Where the middle of a square is drawn. */
+  private cellScreen(col: number, row: number): Point {
+    const c = tileCenter(col, row);
+    return this.screenAt(c.x, c.y);
+  }
+
+  /** Shows the placement preview on a square, standing at that square's own height. */
+  private hoverCell(cell: { col: number; row: number } | null): void {
+    this.placement.setHover(cell, cell ? liftOf(this.grid[cell.row]?.[cell.col]) : 0);
+  }
 
   spawnEnemy(key: string): void {
     const def = this.content.enemies[key];
@@ -696,10 +714,13 @@ export class GameScene extends Phaser.Scene {
         if (!e.targetable || e.hp >= e.maxHp) continue;
         if (Math.hypot(e.pos.x - s.pos.x, e.pos.y - s.pos.y) > heal.radius) continue;
         e.heal(amount);
-        healSparkle(this, e.pos.x, e.aimY);
+        healSparkle(this, e.screen.x, e.screen.y);
         healed = true;
       }
-      if (healed) ring(this, s.pos.x, s.pos.y, heal.radius, 0xa7f070);
+      if (healed) {
+        const at = this.screenAt(s.pos.x, s.pos.y);
+        ring(this, at.x, at.y, heal.radius, 0xa7f070);
+      }
     }
   }
 
@@ -759,13 +780,13 @@ export class GameScene extends Phaser.Scene {
           });
           this.addEnemy(child);
         }
-        puff(this, e.pos.x, e.aimY, 0xa7f070);
+        puff(this, e.screen.x, e.screen.y, 0xa7f070);
         return;
       }
       case 'teleport':
-        puff(this, e.pos.x, e.aimY);
+        puff(this, e.screen.x, e.screen.y);
         e.jump(action.distance);
-        puff(this, e.pos.x, e.aimY);
+        puff(this, e.screen.x, e.screen.y);
         return;
       case 'speed':
         e.sprint(action.factor, action.duration);
@@ -776,19 +797,20 @@ export class GameScene extends Phaser.Scene {
           this.damageTower(t, action.damage);
           if (action.stun > 0) t.stun(action.stun);
         }
-        ring(this, e.pos.x, e.pos.y, action.radius, 0xef7d57);
-        burst(this, e.pos.x, e.pos.y, 0xef7d57, 14, action.radius);
+        const at = this.screenAt(e.pos.x, e.pos.y);
+        ring(this, at.x, at.y, action.radius, 0xef7d57);
+        burst(this, at.x, at.y, 0xef7d57, 14, action.radius);
         return;
       case 'shield':
         e.addShield(action.amount * e.maxHp);
-        ring(this, e.pos.x, e.aimY, 14, 0x41a6f6);
+        ring(this, e.screen.x, e.screen.y, 14, 0x41a6f6);
         return;
       case 'cloak':
         e.cloak(action.duration);
         return;
       case 'heal':
         e.heal(action.amount * e.maxHp);
-        healSparkle(this, e.pos.x, e.aimY);
+        healSparkle(this, e.screen.x, e.screen.y);
         return;
     }
   }
@@ -814,7 +836,7 @@ export class GameScene extends Phaser.Scene {
         continue;
       }
       e.attackTimer = 1 / atk.rate;
-      strike(this, { x: e.pos.x, y: e.aimY }, { x: best.x, y: best.y - 4 });
+      strike(this, e.screen, best.top);
       this.damageTower(best, Math.round(atk.damage * Math.sqrt(e.hpMultiplier)));
     }
   }
@@ -822,8 +844,8 @@ export class GameScene extends Phaser.Scene {
   private damageTower(t: Tower, amount: number): void {
     if (amount <= 0) return;
     if (t.damage(amount)) {
-      burst(this, t.x, t.y, 0x566c86, 14, 20);
-      floatText(this, t.x, t.y - 16, 'BROKEN!', '#ef7d57');
+      burst(this, t.top.x, t.top.y, 0x566c86, 14, 20);
+      floatText(this, t.top.x, t.top.y - 16, 'BROKEN!', '#ef7d57');
     }
   }
 
@@ -839,9 +861,9 @@ export class GameScene extends Phaser.Scene {
         else if (def.kind === 'spikes' && !trap.hurt.has(e)) {
           trap.hurt.add(e);
           e.hit(def.damage);
-          burst(this, e.pos.x, e.pos.y, 0xd0dae2, 4, 8);
+          burst(this, this.screenAt(e.pos.x, e.pos.y).x, this.screenAt(e.pos.x, e.pos.y).y, 0xd0dae2, 4, 8);
           if (--trap.usesLeft <= 0) {
-            floatText(this, trap.x, trap.y - 12, 'SPIKES BROKE', '#94b0c2');
+            floatText(this, trap.screen.x, trap.screen.y - 12, 'SPIKES BROKE', '#94b0c2');
             this.removeTrap(trap);
             break;
           }
@@ -850,7 +872,7 @@ export class GameScene extends Phaser.Scene {
           for (const v of this.enemies) {
             if (v.targetable && v.walking && Math.hypot(v.pos.x - trap.x, v.pos.y - trap.y) <= def.radius) v.hit(def.damage);
           }
-          meteorImpact(this, trap.x, trap.y, def.radius);
+          meteorImpact(this, trap.screen.x, trap.screen.y, def.radius);
           break;
         }
       }
@@ -872,8 +894,9 @@ export class GameScene extends Phaser.Scene {
       for (const e of this.enemies) {
         if (e.targetable && !e.flying && Math.hypot(e.pos.x - c.x, e.pos.y - c.y) <= c.radius) e.hurt(c.dps * dt);
       }
-      g.fillStyle(0x38b764, Math.min(0.35, c.t)).fillCircle(c.x, c.y, c.radius);
-      g.fillStyle(0xa7f070, Math.min(0.2, c.t)).fillCircle(c.x - c.radius * 0.3, c.y - c.radius * 0.2, c.radius * 0.5);
+      const at = this.screenAt(c.x, c.y);
+      g.fillStyle(0x38b764, Math.min(0.35, c.t)).fillEllipse(at.x, at.y, c.radius * 2, c.radius * 2 * SQUASH);
+      g.fillStyle(0xa7f070, Math.min(0.2, c.t)).fillEllipse(at.x - c.radius * 0.3, at.y - c.radius * 0.2 * SQUASH, c.radius, c.radius * SQUASH);
     }
     this.clouds = this.clouds.filter((c) => c.t > 0);
   }
@@ -885,7 +908,8 @@ export class GameScene extends Phaser.Scene {
       for (const e of this.enemies) {
         if (e.targetable && !e.flying && Math.hypot(e.pos.x - m.x, e.pos.y - m.y) <= METEOR.radius) e.hit(m.damage, true);
       }
-      meteorImpact(this, m.x, m.y, METEOR.radius);
+      const at = this.screenAt(m.x, m.y);
+      meteorImpact(this, at.x, at.y, METEOR.radius);
     }
     this.pendingMeteors = this.pendingMeteors.filter((m) => m.t > 0);
   }
@@ -901,7 +925,7 @@ export class GameScene extends Phaser.Scene {
     for (const target of targets) {
       const crit = !!tower.def.crit && Math.random() < tower.def.crit.chance;
       const damage = Math.round(tower.stats.damage * (crit ? tower.def.crit!.mult : 1));
-      this.projectiles.push(new Projectile(this, m.x, m.y, tower.def, tower.stats, target, damage, crit));
+      this.projectiles.push(new Projectile(this, m, tower.def, tower.stats, target, damage, crit));
     }
   }
 
@@ -931,8 +955,8 @@ export class GameScene extends Phaser.Scene {
       e.hit(dmg, tower.def.pierce);
       this.onHitEffects(tower.def, tower.stats, e);
     });
-    if (crit) floatText(this, first.pos.x, first.aimY - 14, 'CRIT!', '#ef7d57');
-    lightningBolt(this, [{ x: tower.x, y: tower.y - 8 }, ...hit.map((e) => ({ x: e.pos.x, y: e.aimY }))]);
+    if (crit) floatText(this, first.screen.x, first.screen.y - 14, 'CRIT!', '#ef7d57');
+    lightningBolt(this, [tower.top, ...hit.map((e) => e.screen)]);
   }
 
   /** Slows, burns, stuns and knockback from one hit. */
@@ -957,30 +981,30 @@ export class GameScene extends Phaser.Scene {
       e.hit(p.damage, p.pierce);
       this.onHitEffects(p.tower, stats, e);
     }
-    if (p.crit) floatText(this, p.tx, p.ty - 14, 'CRIT!', '#ef7d57');
+    if (p.crit) floatText(this, p.x, p.y - 14, 'CRIT!', '#ef7d57');
     const cloud = p.tower.cloud;
     if (cloud) this.clouds.push({ x: p.tx, y: p.ty, radius: cloud.radius, dps: cloud.dps, t: cloud.duration });
     switch (p.tower.shot) {
       case 'shell':
       case 'rock':
-        ring(this, p.tx, p.ty, Math.max(stats.splash, 12), 0xef7d57);
-        burst(this, p.tx, p.ty, 0x566c86, 6, 12);
+        ring(this, p.x, p.y, Math.max(stats.splash, 12), 0xef7d57);
+        burst(this, p.x, p.y, 0x566c86, 6, 12);
         break;
       case 'frost':
-        ring(this, p.tx, p.ty, Math.max(stats.splash, 12), 0x73eff7);
+        ring(this, p.x, p.y, Math.max(stats.splash, 12), 0x73eff7);
         break;
       case 'bolt':
-        burst(this, p.tx, p.ty, 0xf4f4f4, 6, 10);
+        burst(this, p.x, p.y, 0xf4f4f4, 6, 10);
         break;
       case 'fire':
-        burst(this, p.tx, p.ty, 0xef7d57, 8, 12);
-        if (stats.splash > 0) ring(this, p.tx, p.ty, stats.splash, 0xffcd75);
+        burst(this, p.x, p.y, 0xef7d57, 8, 12);
+        if (stats.splash > 0) ring(this, p.x, p.y, stats.splash, 0xffcd75);
         break;
       case 'poison':
-        burst(this, p.tx, p.ty, 0xa7f070, 6, 10);
+        burst(this, p.x, p.y, 0xa7f070, 6, 10);
         break;
       case 'magic':
-        ring(this, p.tx, p.ty, Math.max(stats.splash, 10), 0xc27bc2);
+        ring(this, p.x, p.y, Math.max(stats.splash, 10), 0xc27bc2);
         break;
     }
   }
@@ -994,15 +1018,17 @@ export class GameScene extends Phaser.Scene {
       if (e.dead) {
         const reward = killReward(this.difficulty, e.def.reward);
         this.economy.earn(reward);
-        burst(this, e.pos.x, e.aimY, e.def.color, e.def.boss ? 30 : 10, e.def.boss ? 36 : 18);
-        floatText(this, e.pos.x, e.aimY - 10, `+${reward}`);
+        const at = e.screen;
+        burst(this, at.x, at.y, e.def.color, e.def.boss ? 30 : 10, e.def.boss ? 36 : 18);
+        floatText(this, at.x, at.y - 10, `+${reward}`);
         if (e.def.boss) this.banner(`${e.def.name.toUpperCase()}\nDEFEATED!`, '#ffcd75');
         this.fireTriggers(e, 'death');
       } else {
         this.economy.loseLives(e.def.livesCost);
         this.leaks[e.def.key] = (this.leaks[e.def.key] ?? 0) + e.def.livesCost;
         if (fx.enabled) this.cameras.main.shake(e.def.boss ? 400 : 120, e.def.boss ? 0.012 : 0.004);
-        floatText(this, castle.x - 8, castle.y - 18, `-${e.def.livesCost}`, '#b13e53');
+        const at = this.screenAt(castle.x, castle.y);
+        floatText(this, at.x - 8, at.y - 40, `-${e.def.livesCost}`, '#b13e53');
       }
       e.destroy();
     }
@@ -1049,11 +1075,15 @@ export class GameScene extends Phaser.Scene {
     return `${col},${row}`;
   }
 
-  /** The map point under a pointer, allowing for zoom; null when the pointer is over the HUD. */
+  /** The map point under a pointer, allowing for zoom and the angled view; null when the pointer is over the HUD. */
   private toWorld(p: Phaser.Input.Pointer): Point | null {
     if (p.x < 0 || p.x >= MAP_W || p.y < 0 || p.y >= MAP_H) return null;
     const w = this.cameras.main.getWorldPoint(p.x, p.y);
-    return { x: w.x, y: w.y };
+    // Raised or sunken ground is drawn a little higher or lower; a second look allows for that.
+    let y = unprojectY(w.y);
+    const lift = liftOf(this.groundAt(w.x, y));
+    if (lift) y = unprojectY(w.y + lift);
+    return { x: w.x, y };
   }
 
   private cellAt(p: Phaser.Input.Pointer): { col: number; row: number } | null {
@@ -1079,7 +1109,7 @@ export class GameScene extends Phaser.Scene {
     if (this.mapCam.move(p)) return;
     // A finger only moves the preview while it is dragging on the map; it never leaves it on the HUD.
     if (p.wasTouch && (!p.isDown || !this.cellAt(p))) return;
-    this.placement.setHover(this.cellAt(p));
+    this.hoverCell(this.cellAt(p));
     this.aimPos = this.toWorld(p);
   }
 
@@ -1127,7 +1157,7 @@ export class GameScene extends Phaser.Scene {
       // Touch: the first tap on a tile shows the tower and its range, a second tap on the same tile builds.
       const hover = this.placement.hover;
       if (p.wasTouch && (!hover || hover.col !== cell.col || hover.row !== cell.row)) {
-        this.placement.setHover(cell);
+        this.hoverCell(cell);
         return;
       }
       const placed = this.placement.isTrap
@@ -1149,7 +1179,7 @@ export class GameScene extends Phaser.Scene {
   /** Builds a tower if the tile is free and the player can pay. */
   tryPlace(type: string, col: number, row: number): boolean {
     const def = this.towerDefs[type];
-    const { x, y } = tileCenter(col, row);
+    const { x, y } = this.cellScreen(col, row);
     if (!def || !this.isUnlocked(type)) return false;
     if (!this.isBuildable(col, row)) {
       floatText(this, x, y - 12, "CAN'T BUILD", '#b13e53');
@@ -1159,7 +1189,7 @@ export class GameScene extends Phaser.Scene {
       floatText(this, x, y - 12, 'NEED GOLD', '#b13e53');
       return false;
     }
-    const tower = new Tower(this, def, col, row);
+    const tower = new Tower(this, def, col, row, liftOf(this.grid[row]?.[col]));
     this.towers.push(tower);
     this.towerAt.set(this.cellKey(col, row), tower);
     burst(this, x, y + 8, 0xc69060, 8, 14);
@@ -1169,7 +1199,7 @@ export class GameScene extends Phaser.Scene {
   /** Lays a trap on a road square if there is room, gold, and fewer than its limit. */
   tryTrap(type: string, col: number, row: number): boolean {
     const def: TrapDef | undefined = this.content.traps[type];
-    const { x, y } = tileCenter(col, row);
+    const { x, y } = this.cellScreen(col, row);
     if (!def) return false;
     if (!this.canTrap(col, row)) {
       floatText(this, x, y - 12, 'ROAD ONLY', '#b13e53');
@@ -1193,36 +1223,47 @@ export class GameScene extends Phaser.Scene {
     const g = this.rangeGfx;
     g.clear();
     const { type, hover } = this.placement;
+    // Everything here lies on the ground, so circles become ellipses and squares get squashed.
+    const disc = (x: number, y: number, r: number, color: number, alpha: number) =>
+      g.fillStyle(color, alpha).fillEllipse(x, y, r * 2, r * 2 * SQUASH);
+    const circle = (x: number, y: number, r: number, width: number, color: number, alpha: number) =>
+      g.lineStyle(width, color, alpha).strokeEllipse(x, y, r * 2, r * 2 * SQUASH);
+    const square = (col: number, row: number, color: number) => {
+      const top = groundTop(row) - liftOf(this.grid[row]?.[col]);
+      g.lineStyle(2, color, 0.9).strokeRect(col * TILE + 1, top + 1, TILE - 2, TILE_H - 2);
+    };
     if (this.aimingMeteor && this.aimPos) {
-      g.fillStyle(0xef7d57, 0.15).fillCircle(this.aimPos.x, this.aimPos.y, METEOR.radius);
-      g.lineStyle(2, 0xef7d57, 0.9).strokeCircle(this.aimPos.x, this.aimPos.y, METEOR.radius);
+      const at = this.screenAt(this.aimPos.x, this.aimPos.y);
+      disc(at.x, at.y, METEOR.radius, 0xef7d57, 0.15);
+      circle(at.x, at.y, METEOR.radius, 2, 0xef7d57, 0.9);
     } else if (type && hover && this.placement.isTrap) {
       const def = this.content.traps[type];
       const ok = this.canTrap(hover.col, hover.row) && this.economy.canAfford(def.cost) && this.trapCount(type) < def.max;
       this.placement.setValid(ok);
       const color = ok ? 0xa7f070 : 0xb13e53;
-      const { x, y } = tileCenter(hover.col, hover.row);
-      if (def.kind === 'bomb') g.lineStyle(2, color, 0.7).strokeCircle(x, y, def.radius);
-      g.lineStyle(2, color, 0.9).strokeRect(hover.col * TILE + 1, hover.row * TILE + 1, TILE - 2, TILE - 2);
+      const { x, y } = this.cellScreen(hover.col, hover.row);
+      if (def.kind === 'bomb') circle(x, y, def.radius, 2, color, 0.7);
+      square(hover.col, hover.row, color);
     } else if (type && hover) {
       const def = this.towerDefs[type];
       const ok = this.isBuildable(hover.col, hover.row) && this.economy.canAfford(def.cost);
       this.placement.setValid(ok);
       const color = ok ? 0xa7f070 : 0xb13e53;
-      const { x, y } = tileCenter(hover.col, hover.row);
-      g.fillStyle(color, 0.12).fillCircle(x, y, def.levels[0].range);
-      g.lineStyle(2, color, 0.7).strokeCircle(x, y, def.levels[0].range);
-      g.lineStyle(2, color, 0.9).strokeRect(hover.col * TILE + 1, hover.row * TILE + 1, TILE - 2, TILE - 2);
+      const { x, y } = this.cellScreen(hover.col, hover.row);
+      disc(x, y, def.levels[0].range, color, 0.12);
+      circle(x, y, def.levels[0].range, 2, color, 0.7);
+      square(hover.col, hover.row, color);
     } else if (this.selected) {
       const t = this.selected;
-      g.fillStyle(0xf4f4f4, 0.08).fillCircle(t.x, t.y, t.stats.range);
-      g.lineStyle(2, 0xf4f4f4, 0.5).strokeCircle(t.x, t.y, t.stats.range);
-      if (t.def.reveal) g.lineStyle(1, 0xffcd75, 0.6).strokeCircle(t.x, t.y, t.def.reveal);
-      g.lineStyle(2, 0xffcd75, 1).strokeRect(t.col * TILE + 1, t.row * TILE + 1, TILE - 2, TILE - 2);
+      const { x, y } = t.foot;
+      disc(x, y, t.stats.range, 0xf4f4f4, 0.08);
+      circle(x, y, t.stats.range, 2, 0xf4f4f4, 0.5);
+      if (t.def.reveal) circle(x, y, t.def.reveal, 1, 0xffcd75, 0.6);
+      square(t.col, t.row, 0xffcd75);
     } else if (this.selectedTrap) {
       const t = this.selectedTrap;
-      if (t.def.kind === 'bomb') g.lineStyle(2, 0xf4f4f4, 0.5).strokeCircle(t.x, t.y, t.def.radius);
-      g.lineStyle(2, 0xffcd75, 1).strokeRect(t.col * TILE + 1, t.row * TILE + 1, TILE - 2, TILE - 2);
+      if (t.def.kind === 'bomb') circle(t.screen.x, t.screen.y, t.def.radius, 2, 0xf4f4f4, 0.5);
+      square(t.col, t.row, 0xffcd75);
     }
   }
 
@@ -1233,8 +1274,9 @@ export class GameScene extends Phaser.Scene {
       if ((e.hp >= e.maxHp && e.shield <= 0) || e.hidden) continue;
       const scale = e.def.scale ?? 1;
       const w = Math.round(20 * scale);
-      const x = Math.round(e.pos.x - w / 2);
-      const y = Math.round(e.aimY - 18 * scale);
+      const at = e.screen;
+      const x = Math.round(at.x - w / 2);
+      const y = Math.round(at.y - e.displayHeight / 2 - 6);
       const frac = e.hp / e.maxHp;
       g.fillStyle(0x1a1c2c, 1).fillRect(x - 1, y - 1, w + 2, 5);
       g.fillStyle(0xb13e53, 1).fillRect(x, y, w, 3);
@@ -1244,14 +1286,14 @@ export class GameScene extends Phaser.Scene {
     }
     for (const t of this.towers) {
       if (t.hp >= t.maxHp && !t.broken) continue;
-      const x = t.x - 12;
-      const y = t.y + 12;
+      const foot = t.foot;
+      const x = foot.x - 12;
+      const y = foot.y + TILE_H / 2 + 2;
       g.fillStyle(0x1a1c2c, 1).fillRect(x - 1, y - 1, 26, 5);
       g.fillStyle(t.broken ? 0x566c86 : 0xef7d57, 1).fillRect(x, y, Math.ceil((24 * t.hp) / t.maxHp), 3);
     }
   }
 }
-
 /** The point of a route nearest to a position: how far along the route it is, and how far away. */
 function nearestOnRoute(route: Point[], at: Point): { progress: number; d: number } {
   let best = { progress: 0, d: Infinity };

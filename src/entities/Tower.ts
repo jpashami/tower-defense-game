@@ -1,18 +1,30 @@
 import Phaser from 'phaser';
+import { standingTexture } from '../art/standing';
 import { DEPTH, SELL_REFUND, TILE } from '../config/constants';
 import { TARGET_MODES, TOWER_HP, type TargetMode, type TowerDef, type TowerStats } from '../config/towers';
+import { SQUASH, TILE_H, depthAt, liftOf, project } from '../config/view';
 import type { Enemy } from './Enemy';
+import type { ShotOrigin } from './Projectile';
 
 /** Share of what a tower cost that repairing it after it breaks costs. */
 export const REPAIR_SHARE = 0.3;
+/** How tall a tower's base block stands, in screen pixels. */
+export const BASE_HEIGHT = 8;
 
-/** A built tower: picks targets by its targeting mode and fires when ready. */
+/**
+ * A built tower: picks targets by its targeting mode and fires when ready.
+ * It sits at the middle of its square on the flat map (`x`, `y`); the pictures are drawn
+ * where the angled view puts that: a base block standing on the (raised) grass with the
+ * head on its top face. Turning heads lie flat on that face; others stand up.
+ */
 export class Tower {
   readonly def: TowerDef;
   readonly col: number;
   readonly row: number;
   readonly x: number;
   readonly y: number;
+  /** How high this square's ground stands (grass is raised; see view.ts). */
+  readonly lift: number;
   level = 0;
   /** Total gold spent on this tower, used for the sell refund. */
   spent: number;
@@ -25,28 +37,40 @@ export class Tower {
   private readonly scene: Phaser.Scene;
   private readonly base: Phaser.GameObjects.Image;
   private readonly head: Phaser.GameObjects.Image;
+  /** Holds a turning head and squashes it onto the slanted top face. */
+  private readonly headHolder: Phaser.GameObjects.Container;
   private readonly pips: Phaser.GameObjects.Image[] = [];
   private cooldown = 0.25;
   private stunTimer = 0;
 
-  constructor(scene: Phaser.Scene, def: TowerDef, col: number, row: number) {
+  constructor(scene: Phaser.Scene, def: TowerDef, col: number, row: number, lift = liftOf('grass')) {
     this.scene = scene;
     this.def = def;
     this.col = col;
     this.row = row;
     this.x = col * TILE + TILE / 2;
     this.y = row * TILE + TILE / 2;
+    this.lift = lift;
     this.spent = def.cost;
     this.targetMode = def.defaultTarget;
     this.hp = this.maxHp;
-    this.base = scene.add.image(this.x, this.y, def.baseTexture).setDepth(DEPTH.towerBase);
-    this.head = scene.add.image(this.x, this.y, def.headTexture).setDepth(DEPTH.towerHead);
+    const ground = project(this.x, this.y, 0, lift);
+    const depth = depthAt(DEPTH.standing, this.y);
+    this.base = scene.add
+      .image(ground.x, ground.y + TILE_H / 2, standingTexture(scene, def.baseTexture, BASE_HEIGHT))
+      .setOrigin(0.5, 1)
+      .setDepth(depth);
+    this.head = scene.add.image(0, 0, def.headTexture);
+    this.headHolder = scene.add.container(ground.x, ground.y - BASE_HEIGHT, [this.head]).setDepth(depth + 0.00005);
     if (def.tint !== undefined) {
       this.base.setTint(def.tint);
       this.head.setTint(def.tint);
     }
-    if (def.rotates) this.head.setRotation(-Math.PI / 2);
-    else {
+    if (def.rotates) {
+      this.head.setRotation(-Math.PI / 2);
+      this.headHolder.setScale(1, SQUASH);
+    } else {
+      this.head.setOrigin(0.5, 0.7);
       scene.tweens.add({
         targets: this.head,
         scale: 1.1,
@@ -90,6 +114,16 @@ export class Tower {
     return this.stunTimer > 0;
   }
 
+  /** Where the tower's head is drawn, for effects and messages. */
+  get top(): { x: number; y: number } {
+    return { x: this.headHolder.x, y: this.headHolder.y };
+  }
+
+  /** Where the tower stands on the drawn ground. */
+  get foot(): { x: number; y: number } {
+    return project(this.x, this.y, 0, this.lift);
+  }
+
   /** Whether this tower can shoot that enemy at all (flyers need an air-capable tower; hidden ones can't be seen). */
   canHit(e: Enemy): boolean {
     return e.seen && (!e.flying || this.def.hitsAir);
@@ -121,11 +155,12 @@ export class Tower {
     return targets;
   }
 
-  /** Where projectiles leave the tower. */
-  muzzle(): { x: number; y: number } {
-    if (!this.def.rotates) return { x: this.x, y: this.y - 4 };
+  /** Where projectiles leave the tower: a map point and its height above the ground. */
+  muzzle(): ShotOrigin {
+    const z = BASE_HEIGHT + (this.def.rotates ? 4 : 14);
+    if (!this.def.rotates) return { x: this.x, y: this.y, z, lift: this.lift };
     const r = this.head.rotation;
-    return { x: this.x + Math.cos(r) * 12, y: this.y + Math.sin(r) * 12 };
+    return { x: this.x + Math.cos(r) * 12, y: this.y + Math.sin(r) * 12, z, lift: this.lift };
   }
 
   cycleTarget(): void {
@@ -141,8 +176,8 @@ export class Tower {
     this.level++;
     if (!this.broken) this.hp += this.maxHp - before;
     const pip = this.scene.add
-      .image(this.x + 11 - (this.level - 1) * 7, this.y - 11, 'pip')
-      .setDepth(DEPTH.towerHead + 0.1);
+      .image(this.headHolder.x + 11 - (this.level - 1) * 7, this.headHolder.y - 11 * SQUASH, 'pip')
+      .setDepth(this.headHolder.depth + 0.00001);
     this.pips.push(pip);
     this.scene.tweens.add({
       targets: [this.base, this.head],
@@ -185,7 +220,7 @@ export class Tower {
   destroy(): void {
     this.scene.tweens.killTweensOf([this.base, this.head]);
     this.base.destroy();
-    this.head.destroy();
+    this.headHolder.destroy();
     this.pips.forEach((p) => p.destroy());
   }
 
@@ -212,7 +247,7 @@ export class Tower {
   private recoil(): void {
     if (!this.def.rotates) return;
     const r = this.head.rotation;
-    this.head.setPosition(this.x - Math.cos(r) * 3, this.y - Math.sin(r) * 3);
-    this.scene.tweens.add({ targets: this.head, x: this.x, y: this.y, duration: 120, ease: 'Quad.easeOut' });
+    this.head.setPosition(-Math.cos(r) * 3, -Math.sin(r) * 3);
+    this.scene.tweens.add({ targets: this.head, x: 0, y: 0, duration: 120, ease: 'Quad.easeOut' });
   }
 }
