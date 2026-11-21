@@ -1,5 +1,6 @@
 import { PALETTE } from '../art/palette';
 import { TILE } from '../config/constants';
+import { FAMILY_GAME, type FamilyGame } from '../config/family';
 import { DIFFICULTIES, type DifficultyDef, type DifficultyKey } from '../config/difficulty';
 import { ENEMIES, type EnemyAbility, type EnemyAction, type EnemyDef, type EnemyTrigger } from '../config/enemies';
 import { TOWER_ORDER, TOWERS, type ShotLook, type TargetMode, type TowerDef, type TowerStats } from '../config/towers';
@@ -36,7 +37,7 @@ export interface GameRules {
 
 /** Everything a game is played with: the default game, or a family version on top of it. */
 export interface GameContent {
-  /** 'classic' for the default game, else a short hash of the version. */
+  /** 'classic' for the original game, 'family' for a family copy's own game (config/family.ts), else a short hash of the version. */
   id: string;
   version: VersionData | null;
   name: string;
@@ -56,7 +57,8 @@ export interface GameContent {
 
 const DEFAULT_THEME = { accent: 0x73eff7, panel: 0x1a1c2c };
 
-export const DEFAULT_CONTENT: GameContent = {
+/** The original game, exactly as it comes. The Creator and every family version are built on it. */
+export const ORIGINAL_CONTENT: GameContent = {
   id: 'classic',
   version: null,
   name: 'CLASSIC',
@@ -72,6 +74,36 @@ export const DEFAULT_CONTENT: GameContent = {
   sprites: {},
   familiar: new Set(['grunt', 'runner', 'brute']),
 };
+
+/** True when this copy of the game adds its own towers, enemies or waves (config/family.ts). */
+export function hasFamilyGame(game: FamilyGame = FAMILY_GAME): boolean {
+  return Object.keys(game.towers).length > 0 || Object.keys(game.enemies).length > 0 || game.waves !== null;
+}
+
+/** A family copy's own game: the original with the family's towers, enemies and waves added. */
+export function buildFamilyContent(game: FamilyGame): GameContent {
+  const towers = { ...TOWERS, ...game.towers };
+  const towerOrder = game.towerOrder
+    ? game.towerOrder.filter((k) => Object.prototype.hasOwnProperty.call(towers, k))
+    : [...TOWER_ORDER, ...Object.keys(game.towers).filter((k) => !(TOWER_ORDER as string[]).includes(k))];
+  return {
+    ...ORIGINAL_CONTENT,
+    id: 'family',
+    name: game.name,
+    enemies: { ...ENEMIES, ...game.enemies },
+    towers,
+    towerOrder,
+    waves: game.waves ?? WAVES,
+    familiar: new Set(ORIGINAL_CONTENT.familiar),
+  };
+}
+
+const FAMILY_CONTENT: GameContent | null = hasFamilyGame() ? buildFamilyContent(FAMILY_GAME) : null;
+
+/** The game played when nothing else is picked: the family's own game if this copy has one, else the original. */
+export function defaultContent(): GameContent {
+  return FAMILY_CONTENT ?? ORIGINAL_CONTENT;
+}
 
 /** A short, stable id for a version's contents. */
 export function versionHash(v: VersionData): string {
@@ -104,7 +136,11 @@ export function difficultyFor(key: DifficultyKey, rules: GameRules | null): Diff
   };
 }
 
-/** Turns a checked version into game content. Only reads; never runs anything from the version. */
+/**
+ * Turns a checked version into game content. Only reads; never runs anything from the version.
+ * Versions build on the original tables (not a family copy's additions), so a shared link
+ * plays the same game in every copy.
+ */
 export function compileVersion(v: VersionData): GameContent {
   const id = versionHash(v);
   const palette: Record<string, string> = { ...PALETTE, ...(v.colors ?? {}) };

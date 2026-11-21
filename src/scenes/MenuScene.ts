@@ -12,7 +12,7 @@ import { renderMap, standing } from '../systems/MapRenderer';
 import { Button } from '../ui/Button';
 import { centreScene, fullScreenRect } from '../ui/layout';
 import { isTouchDevice } from '../ui/touch';
-import { difficultyFor, type GameContent } from '../version/compile';
+import { difficultyFor, hasFamilyGame, ORIGINAL_CONTENT, type GameContent } from '../version/compile';
 import { onIncoming, takeIncoming } from '../version/incoming';
 import { isRandomPlan, levelForContent } from '../version/levels';
 import { activeContent, isTryingVersion, useSavedVersion } from '../version/registry';
@@ -78,7 +78,7 @@ export class MenuScene extends Phaser.Scene {
       y: 8,
       w: 220,
       h: 26,
-      label: v ? `VERSION: ${v.name}`.slice(0, 26) : 'VERSION: CLASSIC',
+      label: `VERSION: ${v ? v.name : this.builtInName()}`.slice(0, 26),
       variant: v ? 'accent' : 'default',
       depth: 21,
       onClick: () => this.scene.start('Versions'),
@@ -88,7 +88,11 @@ export class MenuScene extends Phaser.Scene {
     t.setLineSpacing(12);
     this.tweens.add({ targets: t, y: 76, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     const accent = `#${this.content.theme.accent.toString(16).padStart(6, '0')}`;
-    title(140, v ? `${v.name}${v.author ? ` by ${v.author}` : ''}` : `Hold the castle for ${this.content.waves.length} waves`, 8, v ? accent : '#94b0c2');
+    const hold = `Hold the castle for ${this.content.waves.length} waves`;
+    let subtitle = hold;
+    if (v) subtitle = `${v.name}${v.author ? ` by ${v.author}` : ''}`;
+    else if (this.content.id === 'family') subtitle = `${this.content.name}: ${hold.toLowerCase()}`;
+    title(140, subtitle, 8, v ? accent : '#94b0c2');
 
     // Difficulty picker.
     const bw = 96;
@@ -155,6 +159,12 @@ export class MenuScene extends Phaser.Scene {
     if (incoming) this.time.delayedCall(10, () => this.scene.start('Versions', { incoming }));
     onIncoming((r) => this.scene.isActive() && this.scene.start('Versions', { incoming: r }));
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => onIncoming(null));
+  }
+
+  /** CLASSIC, or in a copy with its own game (config/family.ts) ORIGINAL or that game's name. */
+  private builtInName(): string {
+    if (this.content.id === 'family') return this.content.name;
+    return hasFamilyGame() ? 'ORIGINAL' : 'CLASSIC';
   }
 
   private setDifficulty(key: DifficultyKey): void {
@@ -253,7 +263,11 @@ export class MenuScene extends Phaser.Scene {
 
   /** The default game parades its classic enemies; a version shows off its own. */
   private spawnWalker(): void {
-    const own = (this.content.version?.enemies ?? []).map((e) => e.id);
+    const own = this.content.version
+      ? (this.content.version.enemies ?? []).map((e) => e.id)
+      : this.content.id === 'family'
+        ? Object.keys(this.content.enemies).filter((k) => !Object.prototype.hasOwnProperty.call(ORIGINAL_CONTENT.enemies, k))
+        : [];
     const order = own.length ? own : ['grunt', 'runner', 'knight', 'grunt', 'wolf', 'shaman', 'brute', 'runner'];
     const def = this.content.enemies[order[this.spawnCount++ % order.length]];
     if (!def) return;

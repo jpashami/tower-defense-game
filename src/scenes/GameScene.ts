@@ -24,7 +24,7 @@ import { renderMap, standing } from '../systems/MapRenderer';
 import { PlacementController } from '../systems/PlacementController';
 import { WaveManager } from '../systems/WaveManager';
 import { isTouchDevice } from '../ui/touch';
-import { DEFAULT_CONTENT, difficultyFor, type GameContent } from '../version/compile';
+import { difficultyFor, ORIGINAL_CONTENT, type GameContent } from '../version/compile';
 import { levelForContent } from '../version/levels';
 import { activeContent } from '../version/registry';
 import { ensureVersionTextures } from '../version/textures';
@@ -66,7 +66,7 @@ export class GameScene extends Phaser.Scene {
   difficulty!: DifficultyDef;
   level!: LevelDef;
   /** The default game, or the player's family version. */
-  content: GameContent = DEFAULT_CONTENT;
+  content: GameContent = ORIGINAL_CONTENT;
   /** Set when playing a Creator level, so the player can go back to editing it. */
   custom: CustomLevel | null = null;
   mapMode: MapMode = 'random';
@@ -132,7 +132,8 @@ export class GameScene extends Phaser.Scene {
     // The scene object is reused on restart, so reset everything here.
     // Creator levels use the original towers and enemies, Normal rules, and their own gold and lives.
     this.custom = data?.custom ?? null;
-    this.content = this.custom ? DEFAULT_CONTENT : activeContent();
+    // Creator levels always use the original towers and enemies, so their share codes play the same everywhere.
+    this.content = this.custom ? ORIGINAL_CONTENT : activeContent();
     ensureVersionTextures(this, this.content);
     this.mapMode = data?.map ?? loadMapMode();
     this.seed = data?.seed ?? randomSeed();
@@ -213,7 +214,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.scene.launch('UI');
-    const title = this.custom ? level.name : this.content.version ? this.content.name : '';
+    const title = this.custom ? level.name : this.content.version || this.content.id === 'family' ? this.content.name : '';
     // The view starts fitted to the whole map, so its middle is the map's middle.
     const middle =
       this.cols * TILE > MAP_W || viewHeight(this.rows) > MAP_H ? { x: (this.cols * TILE) / 2, y: viewHeight(this.rows) / 2 } : { x: MAP_W / 2, y: MAP_H / 2 };

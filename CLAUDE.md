@@ -7,6 +7,7 @@ The people asking you for changes are often parents and children, not programmer
 ## How the game is put together
 
 - `src/config/` holds all the game's numbers and tables: towers, enemies, waves, difficulty, spells, the classic map. Most changes are edits here, not in the scenes. Keep new numbers in config files too.
+- `src/config/family.ts` is where a family copy's **own** towers, enemies and waves go. `towers.ts`, `enemies.ts` and `waves.ts` are the original game: change them only for fixes meant for everyone. Anything in `family.ts` makes MY VERSION list both ORIGINAL GAME and the family's game, so the original always stays playable. Creator levels and version links always use the original tables.
 - `src/art/` draws every sprite in code on small grids (`draw.ts` helpers, single-character colours from `palette.ts`). There are no image files for the game's art. Enemies have two walk frames, `<key>_0` and `<key>_1`, registered in `sprites.ts`.
 - `src/entities/` (Enemy, Tower, Projectile, Trap), `src/systems/` (map generator, waves, economy, placement, map drawing, camera), `src/scenes/` (Menu, Game, UI, GameOver, Editor = the Creator, Versions, Players, Suggest).
 - The game is drawn in an angled "2.5D" view, but it is played on a flat grid: routes, ranges and positions are plain map coordinates. `src/config/view.ts` is the one place that turns a map point into where it is drawn (rows squashed, grass raised, water sunk, standing things upright at their feet). Game logic never needs to know about it; only drawing code calls `project`.
@@ -44,4 +45,4 @@ On the dev server, the browser console has `simulateMany({ difficulty: 'normal',
 
 ## Family copies
 
-Many people working here have their own copy of the game made with "Use this template". The original is `jpashami/tower-defense-game`. The commands in `.claude/commands/` (`/new-tower`, `/new-enemy`, `/change-look`, `/get-updates`, `/my-share-link`) are written for them. Ideas for the original game go through its feature form (see `CONTRIBUTING.md`).
+Many people working here have their own copy of the game made with "Use this template". The original is `jpashami/tower-defense-game`. The commands in `.claude/commands/` (`/new-tower`, `/new-enemy`, `/change-look`, `/get-updates`, `/my-share-link`) are written for them. New towers and enemies for a family's own game go in `src/config/family.ts`, never into the original tables. Ideas for the original game go through its feature form (see `CONTRIBUTING.md`).

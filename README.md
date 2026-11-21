@@ -268,6 +268,8 @@ CONTRIBUTING.md        Asking for features, voting, and building approved ideas
 
 Everything is table-driven, so most changes are edits to files in `src/config`.
 
+- **Your own copy's towers, enemies and waves**: put them in `src/config/family.ts`, not in `towers.ts`, `enemies.ts` or `waves.ts` (those are the original game). Then **MY VERSION** lists both **ORIGINAL GAME** and your game, so the original is always one tap away. The steps below for a new tower or enemy work the same way, with the entry going into `FAMILY_GAME` instead.
+
 - **Balance**: change numbers in `towers.ts`, `enemies.ts` or `waves.ts`.
 - **Difficulty**: change starting gold, lives, enemy health growth, speed, wave size and kill rewards per level in `difficulty.ts`.
 - **New wave**: add an entry to `WAVES` in `waves.ts`. The game picks up the new total automatically.
