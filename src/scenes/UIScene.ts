@@ -66,7 +66,9 @@ export class UIScene extends Phaser.Scene {
   private startBtn!: Button;
   private speedBtn!: Button;
   private pauseBtn!: Button;
-  private quitBtn!: Button;
+  private menuBtn!: Button;
+  private leaveBtn!: Button;
+  private keepBtn!: Button;
   private cancelBtn!: Button;
   private repairBtn!: Button;
 
@@ -119,15 +121,17 @@ export class UIScene extends Phaser.Scene {
     // Phones have no right-click or Esc, so placing a tower or aiming the meteor gets a button to stop.
     this.repairBtn = new Button(this, { x: X, y: ACTION_Y, w: W, h: BTN_H, label: '', variant: 'primary', onClick: () => this.gs.repairSelected() });
     this.cancelBtn = new Button(this, { x: X, y: ACTION_Y, w: W, h: BTN_H, label: 'CANCEL', variant: 'danger', onClick: () => this.gs.cancelAll() });
-    this.quitBtn = new Button(this, {
+    // Shown after MENU: leave this game, or carry on.
+    this.leaveBtn = new Button(this, {
       x: X,
       y: ACTION_Y,
       w: W,
       h: BTN_H,
-      label: this.gs.custom ? 'BACK TO CREATOR' : 'MAIN MENU',
+      label: this.gs.custom ? 'BACK TO CREATOR' : 'LEAVE',
       variant: 'danger',
       onClick: () => this.gs.quit(),
     });
+    this.keepBtn = new Button(this, { x: X, y: sellY, w: W, h: BTN_H, label: 'KEEP PLAYING', variant: 'primary', onClick: () => this.gs.keepPlaying() });
 
     this.spellBtns = {} as Record<SpellKey, Button>;
     SPELL_ORDER.forEach((key, i) => {
@@ -143,8 +147,10 @@ export class UIScene extends Phaser.Scene {
     });
 
     this.startBtn = new Button(this, { x: X, y: START_Y, w: W, h: BTN_H, label: 'START WAVE', variant: 'primary', onClick: () => this.gs.startNextWave() });
-    this.speedBtn = new Button(this, { x: X, y: SPEED_Y, w: half, h: BTN_H, label: '', onClick: () => this.gs.toggleSpeed() });
-    this.pauseBtn = new Button(this, { x: X + half + 4, y: SPEED_Y, w: half, h: BTN_H, label: '', onClick: () => this.gs.togglePause() });
+    // Speed, pause and menu share the last row. Whole-pixel widths keep the button edges sharp.
+    this.speedBtn = new Button(this, { x: X, y: SPEED_Y, w: 44, h: BTN_H, label: '', onClick: () => this.gs.toggleSpeed() });
+    this.pauseBtn = new Button(this, { x: X + 48, y: SPEED_Y, w: 48, h: BTN_H, label: '', onClick: () => this.gs.togglePause() });
+    this.menuBtn = new Button(this, { x: X + 100, y: SPEED_Y, w: W - 100, h: BTN_H, label: 'MENU', onClick: () => this.gs.askLeave() });
     if (!isTouchDevice()) this.text(X + W / 2, SPEED_Y + BTN_H + 3, 'Q METEOR  W FREEZE', '#566c86').setOrigin(0.5, 0);
   }
 
@@ -209,15 +215,18 @@ export class UIScene extends Phaser.Scene {
     else if (gs.countdown > 0) this.startBtn.setLabel(`NEXT IN ${Math.ceil(gs.countdown)}s`).setEnabled(true);
     else this.startBtn.setLabel('START WAVE').setEnabled(true);
 
-    this.speedBtn.setLabel(gs.speed === 2 ? '>> 2X' : '> 1X').setActive(gs.speed === 2);
-    this.pauseBtn.setLabel(gs.paused ? 'PLAY' : 'PAUSE').setActive(gs.paused);
+    this.speedBtn.setLabel(gs.speed === 2 ? '2X' : '1X').setActive(gs.speed === 2);
+    this.pauseBtn.setLabel(gs.paused ? 'PLAY' : 'PAUSE').setActive(gs.paused && !gs.leaving);
+    this.menuBtn.setEnabled(!gs.isOver).setActive(gs.leaving);
   }
 
   private updateInfo(): void {
     const gs = this.gs;
     const t = gs.selected;
     const paused = gs.paused && !gs.isOver;
-    this.quitBtn.setVisible(paused);
+    const leaving = paused && gs.leaving;
+    this.leaveBtn.setVisible(leaving);
+    this.keepBtn.setVisible(leaving);
     this.cancelBtn.setVisible(!paused && gs.isChoosing && !gs.isOver);
     this.showPreview(false);
     this.upgradeBtn.setVisible(false);
@@ -225,9 +234,14 @@ export class UIScene extends Phaser.Scene {
     this.targetBtn.setVisible(false);
     this.repairBtn.setVisible(false);
 
+    if (leaving) {
+      this.infoTitle.setText('LEAVE?');
+      this.infoBody.setText(gs.custom ? 'Go back to the\nCreator to\nchange your\nlevel?' : 'Leave this\ngame for the\ntitle screen?\n\nThis game will\nnot be saved.');
+      return;
+    }
     if (paused) {
       this.infoTitle.setText('PAUSED');
-      this.infoBody.setText(gs.custom ? 'Press PLAY to\ncarry on, or go\nback to change\nyour level.' : 'Press PLAY to\ncarry on, or\nleave this game.');
+      this.infoBody.setText('Press PLAY to\ncarry on.\n\nMENU leaves\nthis game.');
       return;
     }
     if (gs.aimingMeteor) {

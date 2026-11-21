@@ -14,6 +14,12 @@ export interface SavedVersion {
 const LIST_KEY = 'versions';
 const ACTIVE_KEY = 'active-version';
 
+/**
+ * The saved choice meaning "the original game" in a family copy that has its own game.
+ * Version ids are short hashes (at most 7 characters), so they can never be this.
+ */
+export const ORIGINAL_ID = 'original';
+
 /** The current player's saved versions. Each is checked again on the way in, like anything from outside. */
 export function listVersions(): SavedVersion[] {
   try {
@@ -52,7 +58,7 @@ export function saveVersion(data: VersionData, replace?: string): SaveVersionRes
   else list.push({ id, data });
   const wasActive = activeVersionId();
   if (!playerSet(LIST_KEY, JSON.stringify(list))) return { ok: false, reason: 'storage' };
-  if (same >= 0 && wasActive && !list.some((v) => v.id === wasActive)) setActiveVersionId(id);
+  if (same >= 0 && wasActive && wasActive !== ORIGINAL_ID && !list.some((v) => v.id === wasActive)) setActiveVersionId(id);
   return { ok: true, id };
 }
 
@@ -61,7 +67,7 @@ export function deleteVersion(id: string): void {
   if (activeVersionId() === id) setActiveVersionId(null);
 }
 
-/** Which saved version the current player plays; null for the classic game. */
+/** Which saved version the current player plays; null for the default game, ORIGINAL_ID for the original. */
 export function activeVersionId(): string | null {
   return playerGet(ACTIVE_KEY) || null;
 }

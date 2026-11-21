@@ -60,11 +60,11 @@ To put it on a phone:
 - **With a USB cable (easiest):** on the phone, open **Settings > About phone** and tap **Build number** seven times to unlock Developer options, then turn on **USB debugging** in **Settings > System > Developer options**. Plug the phone in, accept the prompt on the phone, pick it in the device list at the top of Android Studio and press the green **Run** button. The app installs and opens.
 - **Without a cable:** copy `app-debug.apk` to the phone (Google Drive, email, USB storage), open it in the phone's Files app, and allow installing from that app when asked.
 
-A debug APK is fine for your own family's phones. Publishing on Google Play needs a signed release build (**Build > Generate Signed App Bundle / APK**) and a Play developer account.
+A debug APK is fine for your own family's phones. To publish on **Google Play**, follow [docs/PUBLISHING.md](docs/PUBLISHING.md): it covers making your upload key, `npm run android:bundle` (a signed release build), the Play Console forms, the store pictures and the testing Google asks for. The game's privacy policy is [public/privacy.html](public/privacy.html).
 
-The app icon and splash screen are the game's own archer tower, drawn by `npm run icons` (`scripts/make-icons.mjs`) from the sprites in `src/art/`. Run it again after changing that art, then `npm run android:sync`.
+The app icon, splash screen and Google Play store pictures (`store/`) are drawn by `npm run icons` (`scripts/make-icons.mjs`) from the sprites in `src/art/`. Run it again after changing that art, then `npm run android:sync`.
 
-**iPhone app:** a native iOS build (`npx cap add ios`) needs a Mac with Xcode, so it is not set up here. On iPhones, use Option 1.
+**iPhone app:** a native iOS build (`npx cap add ios`) needs a Mac with Xcode and an Apple Developer membership, so it is not set up here; the steps are at the end of [docs/PUBLISHING.md](docs/PUBLISHING.md). Until then, on iPhones use Option 1.
 
 ## How to play
 
@@ -106,9 +106,9 @@ Random maps have a **shortcut**: a darker strip of dirt cutting across one bend 
 | Space | Start next wave |
 | F | Toggle 1x / 2x speed |
 | P | Pause |
-| Esc / right-click | Cancel |
+| Esc / right-click | Cancel (Esc with nothing to cancel asks to leave the game) |
 
-Pause the game to see a button for leaving it.
+Press **MENU** (bottom right) to leave a game. It pauses and asks first, so nothing is lost by a slip of the finger.
 
 ## Make your own level
 
@@ -267,6 +267,8 @@ CONTRIBUTING.md        Asking for features, voting, and building approved ideas
 ## Changing the game
 
 Everything is table-driven, so most changes are edits to files in `src/config`.
+
+- **Your own copy's towers, enemies and waves**: put them in `src/config/family.ts`, not in `towers.ts`, `enemies.ts` or `waves.ts` (those are the original game). Then **MY VERSION** lists both **ORIGINAL GAME** and your game, so the original is always one tap away. The steps below for a new tower or enemy work the same way, with the entry going into `FAMILY_GAME` instead.
 
 - **Balance**: change numbers in `towers.ts`, `enemies.ts` or `waves.ts`.
 - **Difficulty**: change starting gold, lives, enemy health growth, speed, wave size and kill rewards per level in `difficulty.ts`.

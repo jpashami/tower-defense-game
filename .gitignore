@@ -1,2 +1,6 @@
 node_modules
 dist
+# Google Play upload keys and their passwords: never commit these.
+*.jks
+*.keystore
+keystore.properties

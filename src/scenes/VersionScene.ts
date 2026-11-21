@@ -6,13 +6,14 @@ import { currentPlayer } from '../profile/players';
 import { Button, type ButtonOptions } from '../ui/Button';
 import { centreScene, fullScreenRect } from '../ui/layout';
 import { copyText, pasteText, textBoxStyle } from '../ui/textBox';
-import { versionHash } from '../version/compile';
+import { FAMILY_GAME } from '../config/family';
+import { hasFamilyGame, versionHash } from '../version/compile';
 import { EXAMPLE_VERSIONS } from '../version/examples';
 import type { VersionData } from '../version/format';
 import { shareLink } from '../version/link';
 import { buildPrompt } from '../version/prompt';
-import { activeContent, setActiveVersion } from '../version/registry';
-import { activeVersionId, deleteVersion, listVersions, MAX_VERSIONS, sameNameVersion, saveVersion, setActiveVersionId } from '../version/store';
+import { activeContent, setActiveVersion, useOriginalGame } from '../version/registry';
+import { activeVersionId, deleteVersion, listVersions, MAX_VERSIONS, ORIGINAL_ID, sameNameVersion, saveVersion, setActiveVersionId } from '../version/store';
 import { summarize } from '../version/summary';
 import { checkVersion, parseVersionText, type CheckResult } from '../version/validate';
 
@@ -112,8 +113,15 @@ export class VersionScene extends Phaser.Scene {
     this.text(CX, 44, `${player.name}: tap a version to pick it, then PLAY on the title screen.`, 8, '#94b0c2');
     const saved = listVersions();
     const active = activeVersionId();
+    // The original game is always first. A copy with its own game (config/family.ts) lists both.
+    const builtIn: { id: string | null; name: string; data: VersionData | null }[] = hasFamilyGame()
+      ? [
+          { id: ORIGINAL_ID, name: 'ORIGINAL GAME', data: null },
+          { id: null, name: FAMILY_GAME.name, data: null },
+        ]
+      : [{ id: null, name: 'CLASSIC GAME', data: null }];
     const rows: { id: string | null; name: string; data: VersionData | null }[] = [
-      { id: null, name: 'CLASSIC GAME', data: null },
+      ...builtIn,
       ...saved.map((v) => ({ id: v.id, name: v.data.name, data: v.data })),
     ];
     rows.forEach((row, i) => {
@@ -127,7 +135,8 @@ export class VersionScene extends Phaser.Scene {
         label: row.name,
         onClick: () => {
           setActiveVersionId(row.id);
-          setActiveVersion(row.data);
+          if (row.id === ORIGINAL_ID) useOriginalGame();
+          else setActiveVersion(row.data);
           this.showList();
         },
       }).setActive(isActive);

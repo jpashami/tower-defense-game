@@ -24,7 +24,7 @@ import { renderMap, standing } from '../systems/MapRenderer';
 import { PlacementController } from '../systems/PlacementController';
 import { WaveManager } from '../systems/WaveManager';
 import { isTouchDevice } from '../ui/touch';
-import { DEFAULT_CONTENT, difficultyFor, type GameContent } from '../version/compile';
+import { difficultyFor, ORIGINAL_CONTENT, type GameContent } from '../version/compile';
 import { levelForContent } from '../version/levels';
 import { activeContent } from '../version/registry';
 import { ensureVersionTextures } from '../version/textures';
@@ -66,7 +66,7 @@ export class GameScene extends Phaser.Scene {
   difficulty!: DifficultyDef;
   level!: LevelDef;
   /** The default game, or the player's family version. */
-  content: GameContent = DEFAULT_CONTENT;
+  content: GameContent = ORIGINAL_CONTENT;
   /** Set when playing a Creator level, so the player can go back to editing it. */
   custom: CustomLevel | null = null;
   mapMode: MapMode = 'random';
@@ -83,6 +83,8 @@ export class GameScene extends Phaser.Scene {
   countdown = 0;
   speed = 1;
   paused = false;
+  /** True while the HUD asks "Leave this game?" (the game is paused meanwhile). */
+  leaving = false;
   selected: Tower | null = null;
   selectedTrap: Trap | null = null;
   placement!: PlacementController;
@@ -130,7 +132,8 @@ export class GameScene extends Phaser.Scene {
     // The scene object is reused on restart, so reset everything here.
     // Creator levels use the original towers and enemies, Normal rules, and their own gold and lives.
     this.custom = data?.custom ?? null;
-    this.content = this.custom ? DEFAULT_CONTENT : activeContent();
+    // Creator levels always use the original towers and enemies, so their share codes play the same everywhere.
+    this.content = this.custom ? ORIGINAL_CONTENT : activeContent();
     ensureVersionTextures(this, this.content);
     this.mapMode = data?.map ?? loadMapMode();
     this.seed = data?.seed ?? randomSeed();
@@ -154,6 +157,7 @@ export class GameScene extends Phaser.Scene {
     this.countdown = 0;
     this.speed = 1;
     this.paused = false;
+    this.leaving = false;
     this.shortcutOpen = false;
     this.spellCooldown = { meteor: 0, freeze: 0 };
     this.aimingMeteor = false;
@@ -197,7 +201,7 @@ export class GameScene extends Phaser.Scene {
     const kb = this.input.keyboard;
     if (kb) {
       ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT'].forEach((k, i) => kb.on(`keydown-${k}`, () => this.pickShopItem(i)));
-      kb.on('keydown-ESC', () => this.cancelAll());
+      kb.on('keydown-ESC', () => this.onEscape());
       kb.on('keydown-SPACE', () => this.startNextWave());
       kb.on('keydown-U', () => this.upgradeSelected());
       kb.on('keydown-S', () => this.sellSelected());
@@ -210,7 +214,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.scene.launch('UI');
-    const title = this.custom ? level.name : this.content.version ? this.content.name : '';
+    const title = this.custom ? level.name : this.content.version || this.content.id === 'family' ? this.content.name : '';
     // The view starts fitted to the whole map, so its middle is the map's middle.
     const middle =
       this.cols * TILE > MAP_W || viewHeight(this.rows) > MAP_H ? { x: (this.cols * TILE) / 2, y: viewHeight(this.rows) / 2 } : { x: MAP_W / 2, y: MAP_H / 2 };
@@ -387,7 +391,30 @@ export class GameScene extends Phaser.Scene {
   }
 
   togglePause(): void {
-    if (!this.isOver) this.paused = !this.paused;
+    if (this.isOver) return;
+    this.paused = !this.paused;
+    this.leaving = false;
+  }
+
+  /** The MENU button: pause and ask whether to leave this game. */
+  askLeave(): void {
+    if (this.isOver) return;
+    this.cancelAll();
+    this.paused = true;
+    this.leaving = true;
+  }
+
+  /** "KEEP PLAYING": close the question and carry on. */
+  keepPlaying(): void {
+    this.leaving = false;
+    this.paused = false;
+  }
+
+  /** Esc closes the leave question, else stops placing or aiming, else asks to leave. */
+  private onEscape(): void {
+    if (this.leaving) this.keepPlaying();
+    else if (this.isChoosing || this.selected || this.selectedTrap) this.cancelAll();
+    else this.askLeave();
   }
 
   /** Leaves the level: back to the Creator for its levels, else the title screen. */
