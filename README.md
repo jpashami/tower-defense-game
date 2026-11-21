@@ -60,11 +60,11 @@ To put it on a phone:
 - **With a USB cable (easiest):** on the phone, open **Settings > About phone** and tap **Build number** seven times to unlock Developer options, then turn on **USB debugging** in **Settings > System > Developer options**. Plug the phone in, accept the prompt on the phone, pick it in the device list at the top of Android Studio and press the green **Run** button. The app installs and opens.
 - **Without a cable:** copy `app-debug.apk` to the phone (Google Drive, email, USB storage), open it in the phone's Files app, and allow installing from that app when asked.
 
-A debug APK is fine for your own family's phones. Publishing on Google Play needs a signed release build (**Build > Generate Signed App Bundle / APK**) and a Play developer account.
+A debug APK is fine for your own family's phones. To publish on **Google Play**, follow [docs/PUBLISHING.md](docs/PUBLISHING.md): it covers making your upload key, `npm run android:bundle` (a signed release build), the Play Console forms, the store pictures and the testing Google asks for. The game's privacy policy is [public/privacy.html](public/privacy.html).
 
-The app icon and splash screen are the game's own archer tower, drawn by `npm run icons` (`scripts/make-icons.mjs`) from the sprites in `src/art/`. Run it again after changing that art, then `npm run android:sync`.
+The app icon, splash screen and Google Play store pictures (`store/`) are drawn by `npm run icons` (`scripts/make-icons.mjs`) from the sprites in `src/art/`. Run it again after changing that art, then `npm run android:sync`.
 
-**iPhone app:** a native iOS build (`npx cap add ios`) needs a Mac with Xcode, so it is not set up here. On iPhones, use Option 1.
+**iPhone app:** a native iOS build (`npx cap add ios`) needs a Mac with Xcode and an Apple Developer membership, so it is not set up here; the steps are at the end of [docs/PUBLISHING.md](docs/PUBLISHING.md). Until then, on iPhones use Option 1.
 
 ## How to play
 

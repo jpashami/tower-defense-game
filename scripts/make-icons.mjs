@@ -1,6 +1,7 @@
 // Draws the app icons from the game's own pixel art: an archer tower on a grass tile.
-// Run with `npm run icons`. Writes PWA icons to public/icons and, once the Android
-// project exists, launcher icons to android/app/src/main/res.
+// Run with `npm run icons`. Writes PWA icons to public/icons, the Google Play store
+// icon and feature graphic to store/, and, once the Android project exists, launcher
+// icons to android/app/src/main/res.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { register } from 'node:module';
 import { dirname, join } from 'node:path';
@@ -19,7 +20,7 @@ register(
 );
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const { buildSprites, grassTile } = await import('../src/art/sprites.ts');
+const { buildSprites, grassTile, pathTile } = await import('../src/art/sprites.ts');
 const { PALETTE } = await import('../src/art/palette.ts');
 
 const sprites = buildSprites();
@@ -137,6 +138,41 @@ write('public/icons/icon-512.png', icon(512, 0.75));
 // Maskable icons get cropped to a circle or squircle; keep the tower inside the middle 80%.
 write('public/icons/icon-maskable-512.png', icon(512, 0.62));
 write('public/icons/apple-touch-icon.png', icon(180, 0.75));
+
+// Google Play wants a 512x512 icon and a 1024x500 "feature graphic" for the store page.
+console.log('Google Play store images:');
+write('store/icon-512.png', icon(512, 0.75));
+write('store/feature-graphic.png', featureGraphic());
+
+/** A little scene from the game: a road from the portal to the castle, towers beside it, enemies marching. */
+function featureGraphic() {
+  const s = 4;
+  const tile = 32 * s;
+  const img = new Image(1024, 500);
+  img.grass(s);
+  // The grass lines up with the centre, so the middle row of tiles starts at y 192.
+  const roadY = 192;
+  for (let x = -64, i = 0; x < img.w; x += tile, i++) img.grid(pathTile(i % 3), x, roadY, s);
+  const art = (key, x, y, scale = s) => img.grid(sprites[key].grid, x, y, scale);
+  art('portal', 0, roadY);
+  art('castle', img.w - tile, roadY);
+  art('enemy_grunt_0', 230, roadY + 16, 3);
+  art('enemy_knight_1', 360, roadY + 16, 3);
+  art('enemy_wolf_0', 500, roadY + 16, 3);
+  art('enemy_brute_1', 640, roadY + 16, 3);
+  const tower = (kind, x, y) => {
+    art(`base_${kind}`, x, y);
+    art(`head_${kind}`, x, y);
+  };
+  tower('archer', 192, 64);
+  tower('cannon', 576, 64);
+  tower('frost', 384, 320);
+  tower('archer', 704, 320);
+  art('deco_tree', -32, 320);
+  art('deco_tree', 832, 64);
+  art('deco_rock', 64, 0);
+  return img;
+}
 
 const res = 'android/app/src/main/res';
 if (existsSync(join(root, res))) {
