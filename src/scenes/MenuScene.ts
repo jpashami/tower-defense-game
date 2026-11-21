@@ -119,13 +119,15 @@ export class MenuScene extends Phaser.Scene {
     this.mapText = title(248, '', 8, '#94b0c2');
 
     const big = (x: number, label: string, variant: 'primary' | 'accent', onClick: () => void) => {
-      const b = new Button(this, { x, y: 266, w: 150, h: 36, label, variant, depth: 21, onClick });
-      b.label?.setFontSize(label.length > 6 ? 12 : 16);
+      // Wide enough for MY VERSION at 16 pixels.
+      const b = new Button(this, { x, y: 266, w: 172, h: 36, label, variant, depth: 21, onClick });
+      // The pixel font is drawn on an 8-pixel grid, so it stays even only at 8, 16 or 32 pixels.
+      b.label?.setFontSize(16);
       return b;
     };
-    big(cx - 233, 'PLAY', 'primary', () => this.startGame());
-    big(cx - 75, 'CREATE', 'accent', () => this.scene.start('Editor'));
-    big(cx + 83, 'MY VERSION', 'accent', () => this.scene.start('Versions'));
+    big(cx - 266, 'PLAY', 'primary', () => this.startGame());
+    big(cx - 86, 'CREATE', 'accent', () => this.scene.start('Editor'));
+    big(cx + 94, 'MY VERSION', 'accent', () => this.scene.start('Versions'));
 
     title(
       336,

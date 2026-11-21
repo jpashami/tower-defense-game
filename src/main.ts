@@ -78,6 +78,7 @@ function followScreenShape(game: Phaser.Game, holder: HTMLElement): void {
       game.scale.setGameSize(w, GAME_H);
     }
     game.scale.refresh();
+    sharpenScaling(game);
   };
   // Wait for a rotation to settle before measuring.
   const soon = () => {
@@ -93,7 +94,21 @@ function followScreenShape(game: Phaser.Game, holder: HTMLElement): void {
   window.setInterval(() => {
     if (`${holder.clientWidth}x${holder.clientHeight}` !== fittedTo) refit();
   }, 1000);
+  game.scale.on(Phaser.Scale.Events.RESIZE, () => sharpenScaling(game));
   refit();
+}
+
+/**
+ * The game is drawn at 800 pixels wide and then stretched to fit the screen. When it is
+ * stretched by a whole number (2x, 3x) blocky pixel scaling keeps everything razor sharp.
+ * In between (say 1.5x) blocky scaling makes some pixels of the pixel font twice as wide
+ * as others, which looks ragged, so there the browser's smooth scaling is used instead.
+ */
+function sharpenScaling(game: Phaser.Game): void {
+  const canvas = game.canvas;
+  if (!canvas || !canvas.clientWidth) return;
+  const scale = (canvas.clientWidth * window.devicePixelRatio) / game.scale.width;
+  canvas.style.imageRendering = Math.abs(scale - Math.round(scale)) < 0.02 ? 'pixelated' : 'auto';
 }
 
 /**
