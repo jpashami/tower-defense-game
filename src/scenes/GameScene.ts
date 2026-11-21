@@ -83,6 +83,8 @@ export class GameScene extends Phaser.Scene {
   countdown = 0;
   speed = 1;
   paused = false;
+  /** True while the HUD asks "Leave this game?" (the game is paused meanwhile). */
+  leaving = false;
   selected: Tower | null = null;
   selectedTrap: Trap | null = null;
   placement!: PlacementController;
@@ -154,6 +156,7 @@ export class GameScene extends Phaser.Scene {
     this.countdown = 0;
     this.speed = 1;
     this.paused = false;
+    this.leaving = false;
     this.shortcutOpen = false;
     this.spellCooldown = { meteor: 0, freeze: 0 };
     this.aimingMeteor = false;
@@ -197,7 +200,7 @@ export class GameScene extends Phaser.Scene {
     const kb = this.input.keyboard;
     if (kb) {
       ['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT'].forEach((k, i) => kb.on(`keydown-${k}`, () => this.pickShopItem(i)));
-      kb.on('keydown-ESC', () => this.cancelAll());
+      kb.on('keydown-ESC', () => this.onEscape());
       kb.on('keydown-SPACE', () => this.startNextWave());
       kb.on('keydown-U', () => this.upgradeSelected());
       kb.on('keydown-S', () => this.sellSelected());
@@ -387,7 +390,30 @@ export class GameScene extends Phaser.Scene {
   }
 
   togglePause(): void {
-    if (!this.isOver) this.paused = !this.paused;
+    if (this.isOver) return;
+    this.paused = !this.paused;
+    this.leaving = false;
+  }
+
+  /** The MENU button: pause and ask whether to leave this game. */
+  askLeave(): void {
+    if (this.isOver) return;
+    this.cancelAll();
+    this.paused = true;
+    this.leaving = true;
+  }
+
+  /** "KEEP PLAYING": close the question and carry on. */
+  keepPlaying(): void {
+    this.leaving = false;
+    this.paused = false;
+  }
+
+  /** Esc closes the leave question, else stops placing or aiming, else asks to leave. */
+  private onEscape(): void {
+    if (this.leaving) this.keepPlaying();
+    else if (this.isChoosing || this.selected || this.selectedTrap) this.cancelAll();
+    else this.askLeave();
   }
 
   /** Leaves the level: back to the Creator for its levels, else the title screen. */

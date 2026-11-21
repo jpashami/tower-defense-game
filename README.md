@@ -106,9 +106,9 @@ Random maps have a **shortcut**: a darker strip of dirt cutting across one bend 
 | Space | Start next wave |
 | F | Toggle 1x / 2x speed |
 | P | Pause |
-| Esc / right-click | Cancel |
+| Esc / right-click | Cancel (Esc with nothing to cancel asks to leave the game) |
 
-Pause the game to see a button for leaving it.
+Press **MENU** (bottom right) to leave a game. It pauses and asks first, so nothing is lost by a slip of the finger.
 
 ## Make your own level
 
